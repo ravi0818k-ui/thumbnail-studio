@@ -14,6 +14,7 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
   const lastSavedAt = useEditor((s) => s.lastSavedAt)
   const setScreen = useEditor((s) => s.setScreen)
   const setPreviewOpen = useEditor((s) => s.setPreviewOpen)
+  const setTestOpen = useEditor((s) => s.setTestOpen)
   const newProject = useEditor((s) => s.newProject)
   const selection = useEditor((s) => s.selection)
 
@@ -201,6 +202,14 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
               <MenuItem
                 onClick={() => {
                   close()
+                  state.openFundamentals()
+                }}
+              >
+                Design fundamentals…
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  close()
                   state.openColorGuide()
                 }}
               >
@@ -238,6 +247,13 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
       <span className="save-state">
         {dirty ? 'Saving…' : lastSavedAt ? `Saved ${timeAgo(lastSavedAt)}` : 'Not saved yet'}
       </span>
+      <button
+        className="btn ghost"
+        onClick={() => setTestOpen(true)}
+        title="Score this design: faces, contrast, background, colour and text"
+      >
+        Run a test
+      </button>
       <button className="btn ghost" onClick={() => setPreviewOpen(true)} title="Preview as a YouTube card">
         <IconEye /> Preview
       </button>

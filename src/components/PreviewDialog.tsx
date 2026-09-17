@@ -198,7 +198,57 @@ function Surface({ surface, url, title, neighbours, project }: SurfaceProps) {
 
     case 'immersive':
       return <Immersive url={url} title={title} width={surface.width} />
+
+    case 'phone':
+      return <PhoneFeed url={url} title={title} width={surface.width} ratio={ratio} neighbours={neighbours} />
   }
+}
+
+/**
+ * The card inside a phone, which is where most impressions actually land. The
+ * device frame earns its place: a thumbnail with the status bar above it and
+ * the next video pressing in from below reads differently from the same
+ * thumbnail floating on a desktop page, and that pressure is the thing a
+ * desktop-sized preview hides.
+ */
+function PhoneFeed({
+  url,
+  title,
+  width,
+  ratio,
+  neighbours,
+}: {
+  url: string
+  title: string
+  width: number
+  ratio: string
+  neighbours: boolean
+}) {
+  return (
+    <div className="pv-device" style={{ width: width + 30 }}>
+      <div className="pv-device-status">
+        <span>9:41</span>
+        <span>▰▰▰ ▮</span>
+      </div>
+      <div className="pv-device-app">
+        <span className="pv-device-logo">▶ YouTube</span>
+        <span className="pv-device-icons">⌕ ⋮</span>
+      </div>
+      <div className="pv-device-feed">
+        <div className="pv-card" style={{ width }}>
+          <Thumb url={url} width={width} ratio={ratio} />
+          <div className="pv-card-meta">
+            <span className="pv-avatar" />
+            <div>
+              <span className="pv-line-title">{title}</span>
+              <span className="pv-line-sub">Your Channel · 123K views · 1 hour ago</span>
+            </div>
+          </div>
+        </div>
+        {neighbours && <Neighbour width={width} ratio={ratio} seed={8} />}
+      </div>
+    </div>
+  )
 }
 
 function Thumb({ url, width, ratio }: { url: string; width: number; ratio: string }) {

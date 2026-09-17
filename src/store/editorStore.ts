@@ -23,7 +23,7 @@ import { DEFAULT_EXPORT, type ExportSettings } from '../engine/export'
 import { DEFAULT_FOCUS, type FocusOptions, type FocusSelection } from '../engine/objectMask'
 import type { TemplateDef } from '../data/templates'
 
-export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts'
+export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals'
 export type GridMode = 'none' | 'grid' | 'thirds' | 'center'
 /**
  * 'clean' hands the stroke to the Python matte pass instead of erasing, and
@@ -42,6 +42,7 @@ export interface EditorState {
   /** Where the colour guide returns to, so it can be opened from either side. */
   colorsReturnTo: Screen
   fontsReturnTo: Screen
+  fundamentalsReturnTo: Screen
   project: Project
   selection: string[]
   past: Snapshot[]
@@ -58,6 +59,7 @@ export interface EditorState {
   exportSettings: ExportSettings
   exportOpen: boolean
   previewOpen: boolean
+  testOpen: boolean
   eraseMode: EraseMode
   brushSize: number
   /** What the clean brush is doing, shown on the canvas while it runs. */
@@ -79,6 +81,8 @@ export interface EditorState {
   closeColorGuide: () => void
   openFontGuide: () => void
   closeFontGuide: () => void
+  openFundamentals: () => void
+  closeFundamentals: () => void
   setPanel: (panel: PanelId | null) => void
   newProject: (options?: NewProjectOptions) => void
   setFormat: (format: CanvasFormat) => void
@@ -134,6 +138,7 @@ export interface EditorState {
   setExportSettings: (patch: Partial<ExportSettings>) => void
   setExportOpen: (open: boolean) => void
   setPreviewOpen: (open: boolean) => void
+  setTestOpen: (open: boolean) => void
   setEraseMode: (mode: EraseMode) => void
   setBrushStatus: (status: string | null) => void
   setBrushSize: (size: number) => void
@@ -199,6 +204,7 @@ export const useEditor = create<EditorState>((set, get) => {
     screen: 'home',
     colorsReturnTo: 'home',
     fontsReturnTo: 'home',
+    fundamentalsReturnTo: 'home',
     project: emptyProject(),
     selection: [],
     past: [],
@@ -215,6 +221,7 @@ export const useEditor = create<EditorState>((set, get) => {
     exportSettings: { ...DEFAULT_EXPORT },
     exportOpen: false,
     previewOpen: false,
+    testOpen: false,
     eraseMode: 'off',
     brushSize: 40,
     brushStatus: null,
@@ -233,6 +240,9 @@ export const useEditor = create<EditorState>((set, get) => {
     closeColorGuide: () => set((s) => ({ screen: s.colorsReturnTo })),
     openFontGuide: () => set((s) => (s.screen === 'fonts' ? {} : { screen: 'fonts', fontsReturnTo: s.screen })),
     closeFontGuide: () => set((s) => ({ screen: s.fontsReturnTo })),
+    openFundamentals: () =>
+      set((s) => (s.screen === 'fundamentals' ? {} : { screen: 'fundamentals', fundamentalsReturnTo: s.screen })),
+    closeFundamentals: () => set((s) => ({ screen: s.fundamentalsReturnTo })),
     setPanel: (panel) => set((s) => ({ panel: s.panel === panel ? null : panel })),
 
     newProject: (options = {}) => {
@@ -629,6 +639,7 @@ export const useEditor = create<EditorState>((set, get) => {
     setExportSettings: (patch) => set((s) => ({ exportSettings: { ...s.exportSettings, ...patch } })),
     setExportOpen: (exportOpen) => set({ exportOpen }),
     setPreviewOpen: (previewOpen) => set({ previewOpen }),
+    setTestOpen: (testOpen) => set({ testOpen }),
     setEraseMode: (eraseMode) =>
       set((state) => ({
         eraseMode,

@@ -871,12 +871,174 @@ console.log('brand preset: super learner')
   check('the cut-out treatment grades the photo', patch.adjustments?.contrast === 8 && patch.adjustments?.sharpness === 6)
 }
 
+// ---------------------------------------------------------- run a test ---
+console.log('run a test')
+{
+  const tt = await import('../src/engine/thumbnailTest')
+  const { createImage, createShape, createText } = await import('../src/engine/factory')
+  const { DEFAULT_BACKGROUND } = await import('../src/types')
+
+  const design = (objects: SceneObject[]): Project => ({
+    id: 'tt',
+    name: 'Test',
+    format: 'thumbnail',
+    brandId: null,
+    width: 1280,
+    height: 720,
+    safeZone: { top: 4, bottom: 11, left: 3, right: 3, warning: 3 },
+    background: { ...DEFAULT_BACKGROUND },
+    objects,
+    createdAt: 0,
+    updatedAt: 0,
+  })
+
+  // The cross-language pin. `vision.CHECKS` is asserted against this same
+  // order in scripts/test_vision.py, so a check added on either side fails the
+  // suite until the other one catches up.
+  check(
+    'every check id has copy',
+    tt.CHECK_IDS.every((id) => !!tt.CHECK_INFO[id]),
+    tt.CHECK_IDS.filter((id) => !tt.CHECK_INFO[id]).join(', '),
+  )
+  check(
+    'the copy carries no check the ids do not',
+    Object.keys(tt.CHECK_INFO).length === tt.CHECK_IDS.length,
+    `${Object.keys(tt.CHECK_INFO).length} vs ${tt.CHECK_IDS.length}`,
+  )
+  check(
+    'every check names a tab that exists',
+    tt.CHECK_IDS.every((id) => tt.TEST_GROUPS.some((g) => g.id === tt.CHECK_INFO[id].group)),
+  )
+  check(
+    'every check has a label, a reading and a fix',
+    tt.CHECK_IDS.every((id) => {
+      const info = tt.CHECK_INFO[id]
+      return info.label.length > 0 && info.fix.length > 20 && info.absent.length > 0
+    }),
+  )
+  // A reading is interpolated straight into the page, so it must not throw on
+  // the extremes a measurement can actually reach.
+  check(
+    'every reading survives its extremes',
+    tt.CHECK_IDS.every((id) =>
+      [0, 0.5, 1, 21].every((v) => typeof tt.CHECK_INFO[id].read(v, { id, score: 50, value: v }) === 'string'),
+    ),
+  )
+  check('tab ids are unique', new Set(tt.TEST_GROUPS.map((g) => g.id)).size === tt.TEST_GROUPS.length)
+  check('every tab explains itself', tt.TEST_GROUPS.every((g) => g.label.length > 0 && g.about.length > 15))
+  check(
+    'every limits note names a real tab',
+    Object.keys(tt.LIMITS).every((id) => tt.TEST_GROUPS.some((g) => g.id === id)),
+  )
+  // The two tabs a cloud vision API would answer differently are exactly the
+  // two that have to carry the note saying so.
+  check('faces and safe search both state their limits', !!tt.LIMITS.faces && !!tt.LIMITS.safety)
+  check(
+    'every harmony has copy',
+    (['clash', 'monochrome', 'analogous', 'triadic', 'complementary'] as const).every((h) => !!tt.HARMONY_INFO[h]),
+  )
+  check(
+    'checksIn keeps the declared order',
+    tt
+      .checksIn(
+        'contrast',
+        tt.CHECK_IDS.map((id) => ({ id, score: 50, value: 1 })),
+      )
+      .map((c) => c.id)
+      .join() === 'subject,border',
+  )
+  check('checksIn is empty for a scene-only tab', tt.checksIn('labels', []).length === 0)
+
+  // --- the scene half -----------------------------------------------------
+  const project = design([
+    createShape({ shape: 'rect', name: 'Scrim' }),
+    createText({ text: 'why you forget', fontSize: 120, uppercase: true }),
+    createImage('asset-1', 400, 600, 1280, 720, { name: 'Logo mark' }),
+  ])
+
+  const scene = tt.sceneReport(project)
+  check('every layer is listed', scene.objects.length === project.objects.length)
+  check("a layer is named in the reader's words", scene.objects.some((o) => o.kind === 'Text'))
+  check('a layer box is normalised', scene.objects.every((o) => o.box.every((v) => v >= 0 && v <= 1)))
+  check('text layers are reported', scene.text.length === 1 && scene.text[0].font.length > 0)
+  check('uppercase is detected', scene.text[0].caps)
+  check('the headline is counted in words', scene.text[0].words === 3, String(scene.text[0].words))
+  // The number the whole mobile argument rests on: 120 px of 1280 is 13 px on
+  // a 140 px search row.
+  check(
+    'type is measured at the phone row width',
+    Math.abs(scene.text[0].mobilePx - (120 * 140) / 1280) < 0.1,
+    String(scene.text[0].mobilePx),
+  )
+  check(
+    'a layer named as a mark is a logo',
+    scene.logos.some((l) => /logo/i.test(l.name)),
+    scene.logos.map((l) => l.name).join(', '),
+  )
+  check('labels are produced', scene.labels.length > 0)
+  check('a label carries its reason', scene.labels.every((l) => l.detail.length > 10))
+  check(
+    'the second-person hook is spotted',
+    scene.labels.some((l) => l.label === 'Second person'),
+    scene.labels.map((l) => l.label).join(', '),
+  )
+  check('a short headline is called short', scene.labels.some((l) => l.label === 'Short headline'))
+  check('the font list has no repeats', new Set(scene.fonts).size === scene.fonts.length)
+
+  // A hidden layer is listed but excluded from the counts, so "why is my
+  // design missing something" is answered by seeing it greyed out.
+  const hiddenScene = tt.sceneReport({
+    ...project,
+    objects: project.objects.map((o) => (o.type === 'text' ? { ...o, hidden: true } : o)),
+  })
+  check('a hidden layer is still listed', hiddenScene.objects.length === scene.objects.length)
+  check('a hidden layer is marked', hiddenScene.objects.some((o) => o.hidden))
+  check('a hidden layer is out of the count', hiddenScene.layers === scene.layers - 1)
+  check('a hidden headline leaves no words', hiddenScene.words === 0, String(hiddenScene.words))
+
+  // An empty design must not throw — it is the state every new project is in.
+  const emptyScene = tt.sceneReport(design([]))
+  check('an empty design reports no layers', emptyScene.layers === 0 && emptyScene.objects.length === 0)
+  check('an empty design is labelled wordless', emptyScene.labels.some((l) => l.label === 'Wordless'))
+
+  // --- the headline number ------------------------------------------------
+  const fakeReport = {
+    score: {
+      width: 640,
+      height: 360,
+      palette: [],
+      platforms: [
+        { id: 'desktop', width: 360, score: 80, focus: { x: 0.5, y: 0.5 }, metrics: [] },
+        { id: 'mobile', width: 168, score: 60, focus: { x: 0.5, y: 0.5 }, metrics: [] },
+      ],
+    },
+    vision: {
+      checks: [
+        { id: 'faces', score: 90, value: 0.1 },
+        { id: 'subject', score: 30, value: 1.2 },
+        { id: 'border', score: null, value: null },
+      ],
+    },
+  }
+  const top = tt.headline(fakeReport as never)
+  // Mobile, not desktop, because that is where the impressions are — and the
+  // unmeasurable check drops out rather than counting as a zero.
+  check('the overall is the mean of mobile and the measured checks', top.score === 60, String(top.score))
+  check('an unmeasured check is not reported as failing', top.failing.every((c) => c.score !== null))
+  check('failing checks come worst first', top.failing.map((c) => c.id).join() === 'subject')
+  check('the verdict follows the score', top.verdict === 'fair')
+  check(
+    'a report with nothing measurable still returns a number',
+    tt.headline({ score: { platforms: [] }, vision: { checks: [] } } as never).score === 0,
+  )
+}
+
 // ---------------------------------------------------------- preview surfaces
 {
   console.log('preview surfaces')
   const { FORMATS } = await import('../src/data/formats')
   const { surfacesFor, groupedSurfaces, smallestSurface } = await import('../src/data/previewSurfaces')
-  const LAYOUTS = ['grid', 'row', 'feature', 'bare', 'immersive', 'tv']
+  const LAYOUTS = ['grid', 'row', 'feature', 'bare', 'immersive', 'tv', 'phone']
   for (const format of ['thumbnail', 'shorts'] as const) {
     const surfaces = surfacesFor(format)
     const config = FORMATS[format]
@@ -1494,6 +1656,86 @@ console.log('font psychology')
   check('an unknown word finds nothing', fp.searchFontCategories('zzzz').length === 0)
   check('an empty query is every topic', fp.searchTopics('').length === fp.TOPIC_DIRECTIONS.length)
   check('a topic can be looked up', fp.searchTopics('memory').length > 0)
+}
+
+// --------------------------------------------------------- fundamentals ---
+console.log('fundamentals')
+{
+  const fd = await import('../src/data/fundamentals')
+
+  check('the three pillars are all there', fd.PILLARS.length === 3, String(fd.PILLARS.length))
+  check('pillar ids are unique', new Set(fd.PILLARS.map((p) => p.id)).size === 3)
+  check(
+    'every pillar carries items and a colour',
+    fd.PILLARS.every((p) => p.items.length > 0 && /^#[0-9a-f]{6}$/i.test(p.accent)),
+  )
+  check(
+    'the pillars are in teaching order',
+    fd.PILLARS.map((p) => p.id).join() === 'research,science,art',
+  )
+
+  // The hand-off. `FundamentalsScreen.openGuide` switches on the id, so a link
+  // whose id is not one of the two would silently open the colour guide, and a
+  // screen that the router has no case for would blank the app.
+  check('both cross-links are present', fd.CROSS_LINKS.length === 2)
+  check(
+    'every cross-link id matches the screen it opens',
+    fd.CROSS_LINKS.every((l) => l.id === l.screen && (l.screen === 'fonts' || l.screen === 'colors')),
+  )
+  check('every cross-link has a label and a body', fd.CROSS_LINKS.every((l) => l.cta.length > 0 && l.body.length > 40))
+
+  // The comparison cards are styled per id (.fd-hook-a / .fd-hook-b), so the
+  // ids are layout, not just keys.
+  check('the hook comparison is a pair', fd.HOOK_COMPARISON.map((h) => h.id).join() === 'a,b')
+  check('the emotion chain is feeling to curiosity', fd.EMOTION_CHAIN.join() === 'Emotion,Attention,Curiosity')
+  check('every listed emotion has a face', fd.THUMBNAIL_EMOTIONS.every((e) => e.emoji.length > 0 && e.name.length > 0))
+
+  check(
+    'one story pattern is deliberately open-ended',
+    fd.STORY_PATTERNS.filter((s) => s.after === null).length === 1,
+  )
+  check('story ids are unique', new Set(fd.STORY_PATTERNS.map((s) => s.id)).size === fd.STORY_PATTERNS.length)
+
+  check('all four contrast levers are listed', fd.CONTRAST_LEVERS.length === 4)
+  check(
+    'the hierarchy is ranked 1..3 in order',
+    fd.HIERARCHY_STEPS.map((s) => s.rank).join() === '1,2,3',
+  )
+
+  // The heading prints this number, so a drift here is a visible lie.
+  const counted = fd.CHECKLIST.reduce((n, g) => n + g.items.length, 0)
+  check('the checklist count matches the checklist', fd.CHECKLIST_COUNT === counted, String(fd.CHECKLIST_COUNT))
+  check('every checklist group has items', fd.CHECKLIST.every((g) => g.items.length > 0))
+  // Ticks are keyed `group:item`, so a repeat inside a group would make two
+  // checkboxes move together.
+  check(
+    'checklist items are unique within a group',
+    fd.CHECKLIST.every((g) => new Set(g.items).size === g.items.length),
+  )
+  check('checklist group ids are unique', new Set(fd.CHECKLIST.map((g) => g.id)).size === fd.CHECKLIST.length)
+
+  check(
+    'the formula runs research to test',
+    fd.FUNDAMENTALS_FORMULA.map((s) => s.step).join() === 'Research,Emotion,Message,Design,Test',
+  )
+  check('every formula step explains itself', fd.FUNDAMENTALS_FORMULA.every((s) => s.body.length > 0))
+  check('the 3-second test asks four things', fd.THREE_SECOND_TEST.questions.length === 4)
+  check('the closing questions are feel, understand, how', fd.FINAL_QUESTIONS.length === 3)
+  check('the summary covers all six areas', fd.QUICK_SUMMARY.length === 6)
+  check(
+    'no vocabulary list is empty',
+    [
+      fd.RESEARCH_INPUTS,
+      fd.FOOTAGE_EMOTIONS,
+      fd.SCIENCE_CONCEPTS,
+      fd.ART_COMPONENTS,
+      fd.YT_CONTEXT,
+      fd.IDENTITY_SIGNALS,
+      fd.CLUTTER_TRAPS,
+      fd.MOMENT_TABLE,
+      fd.FUNDAMENTALS_INTRO,
+    ].every((list) => list.length > 0),
+  )
 }
 
 // ------------------------------------------------------------ brand: Vivian ---

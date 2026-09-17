@@ -23,6 +23,8 @@ export type SurfaceLayout =
   | 'bare'
   /** Full-bleed with the app's own interface drawn over it — the Shorts player. */
   | 'immersive'
+  /** Inside a phone: the card as the mobile app draws it, device frame and all. */
+  | 'phone'
   /** Living-room scale: large thumbnail, large title beneath. */
   | 'tv'
 
@@ -61,6 +63,17 @@ const THUMBNAIL_SURFACES: PreviewSurface[] = [
   },
   { id: 'queue', group: 'Desktop', label: 'Queue · up next', width: 100, layout: 'row', note: 'The smallest a thumbnail ever gets.' },
 
+  {
+    id: 'm-phone',
+    group: 'Mobile',
+    label: 'In the app · phone feed',
+    width: 360,
+    layout: 'phone',
+    // The device frame is not decoration: a card seen inside a 390 px screen,
+    // with a status bar above it and the next video pressing in below, is a
+    // different read from the same card floating on a desktop page.
+    note: 'How it actually arrives — a full-width card in the YouTube app, in the frame of a phone.',
+  },
   { id: 'm-home', group: 'Mobile', label: 'Home feed · full width', width: 360, layout: 'grid' },
   { id: 'm-related', group: 'Mobile', label: 'Up next column', width: 168, layout: 'row' },
   { id: 'm-search', group: 'Mobile', label: 'Search results', width: 140, layout: 'row' },

@@ -250,15 +250,25 @@ export interface AnalyzeParams {
 
 /** Runs the scorer over a rendered thumbnail and returns its raw report. */
 export async function analyzeImage(image: ImageData, params: AnalyzeParams): Promise<unknown> {
+  return request('analyze', image, params)
+}
+
+/**
+ * The full test: the platform score plus the vision pass, in one round trip.
+ * Both read the same frame, so asking for them separately would render and
+ * transfer the pixels twice.
+ */
+export async function inspectImage(image: ImageData, params: AnalyzeParams): Promise<unknown> {
+  return request('inspect', image, params)
+}
+
+async function request(type: 'analyze' | 'inspect', image: ImageData, params: AnalyzeParams): Promise<unknown> {
   if (status !== 'ready') announce('loading', 'Starting the Python engine')
   const id = nextId++
   const json = await new Promise<string>((resolve, reject) => {
     analyses.set(id, { resolve, reject })
     const buffer = image.data.buffer
-    ensureWorker().postMessage(
-      { type: 'analyze', id, width: image.width, height: image.height, buffer, params },
-      [buffer],
-    )
+    ensureWorker().postMessage({ type, id, width: image.width, height: image.height, buffer, params }, [buffer])
   })
   return JSON.parse(json)
 }

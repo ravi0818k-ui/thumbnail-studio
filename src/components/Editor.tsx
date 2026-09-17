@@ -17,6 +17,7 @@ import BackgroundPanel from './panels/BackgroundPanel'
 import LayersPanel from './panels/LayersPanel'
 import ExportDialog from './ExportDialog'
 import PreviewDialog from './PreviewDialog'
+import TestDialog from './TestDialog'
 import { useAutosave, useKeyboardShortcuts } from '../hooks'
 import { saveProject } from '../storage/projects'
 
@@ -24,6 +25,7 @@ export default function Editor() {
   const panel = useEditor((s) => s.panel)
   const exportOpen = useEditor((s) => s.exportOpen)
   const previewOpen = useEditor((s) => s.previewOpen)
+  const testOpen = useEditor((s) => s.testOpen)
   const projectWidth = useEditor((s) => s.project.width)
   const projectHeight = useEditor((s) => s.project.height)
   const setZoom = useEditor((s) => s.setZoom)
@@ -96,6 +98,7 @@ export default function Editor() {
       </div>
       {exportOpen && <ExportDialog />}
       {previewOpen && <PreviewDialog />}
+      {testOpen && <TestDialog />}
     </div>
   )
 }

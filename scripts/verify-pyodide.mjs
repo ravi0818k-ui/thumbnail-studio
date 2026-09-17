@@ -18,6 +18,7 @@ import { loadPyodide } from 'pyodide'
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE = path.join(ROOT, 'src', 'python', 'enhance.py')
 const SCORE_SOURCE = path.join(ROOT, 'src', 'python', 'score.py')
+const VISION_SOURCE = path.join(ROOT, 'src', 'python', 'vision.py')
 const PY_DIR = '/thumbnail-studio'
 
 // Mirrors BRIDGE in src/workers/pyImage.worker.ts.
@@ -30,6 +31,7 @@ from pyodide.ffi import to_js
 sys.path.insert(0, ${JSON.stringify(PY_DIR)})
 import enhance
 import score
+import vision
 
 _size = [0, 0]
 
@@ -51,6 +53,16 @@ def _analyze(buf, width, height, params_json):
     data = np.frombuffer(buf.to_py(), dtype=np.uint8).reshape(height, width, 4)
     params = json.loads(params_json)
     report = score.analyze(data, params.get("regions") or [], params.get("occlusion") or {})
+    return to_js(json.dumps(report))
+
+def _inspect(buf, width, height, params_json):
+    data = np.frombuffer(buf.to_py(), dtype=np.uint8).reshape(height, width, 4)
+    params = json.loads(params_json)
+    regions = params.get("regions") or []
+    report = {
+        "score": score.analyze(data, regions, params.get("occlusion") or {}),
+        "vision": vision.inspect(data, regions),
+    }
     return to_js(json.dumps(report))
 `
 
@@ -121,6 +133,7 @@ function makeRegion() {
 async function main() {
   const source = await readFile(SOURCE, 'utf8')
   const scoreSource = await readFile(SCORE_SOURCE, 'utf8')
+  const visionSource = await readFile(VISION_SOURCE, 'utf8')
   const image = makeImage()
 
   console.log('pyodide: boot')
@@ -133,11 +146,13 @@ async function main() {
   pyodide.FS.mkdirTree(PY_DIR)
   pyodide.FS.writeFile(`${PY_DIR}/enhance.py`, source, { encoding: 'utf8' })
   pyodide.FS.writeFile(`${PY_DIR}/score.py`, scoreSource, { encoding: 'utf8' })
+  pyodide.FS.writeFile(`${PY_DIR}/vision.py`, visionSource, { encoding: 'utf8' })
   pyodide.runPython(BRIDGE)
   console.log(`  ok   runtime + numpy + pillow ready in ${((Date.now() - started) / 1000).toFixed(1)}s`)
 
   check('enhance.py imports as a module', pyodide.runPython('len(enhance.OPS)') === 13)
   check('score.py imports enhance the way CPython does', pyodide.runPython('len(score.METRICS)') === 7)
+  check('vision.py imports both modules', pyodide.runPython('len(vision.CHECKS)') === 8)
   check('numpy is the WebAssembly build', String(pyodide.runPython('import numpy; numpy.__version__')).length > 0)
   check('Pillow is available for Lanczos', pyodide.runPython('from PIL import Image; hasattr(Image, "LANCZOS")') === true)
 
@@ -208,6 +223,27 @@ async function main() {
   check('scores are in range', parsed.platforms.every((p) => p.score >= 0 && p.score <= 100))
   check('a palette comes back', Array.isArray(parsed.palette) && parsed.palette.length > 0)
   check('numpy.fft works in WebAssembly', parsed.platforms[0].metrics.some((m) => m.id === 'focus' && m.score !== null))
+
+  // The test report: the second bridge function, and the only place the vision
+  // module's union-find labelling and HSV geometry run under WebAssembly.
+  const inspect = pyodide.globals.get('_inspect')
+  const testJson = String(unwrap(inspect(matte, WIDTH, HEIGHT, JSON.stringify(scoreParams))))
+  const test = JSON.parse(testJson)
+  check('the test returns both halves', !!test.score && !!test.vision)
+  check(
+    'every declared vision check comes back',
+    test.vision.checks.length === 8 && test.vision.checks.every((c) => 'score' in c && 'value' in c),
+  )
+  check(
+    'vision scores are in range',
+    test.vision.checks.every((c) => c.score === null || (c.score >= 0 && c.score <= 100)),
+  )
+  check('the harmony is classified', typeof test.vision.color.harmony === 'string')
+  check('face regions come back as an array', Array.isArray(test.vision.faces))
+  check(
+    'the text backing is measured where the text is',
+    test.vision.text_backing.length === 1 && test.vision.text_backing[0].box[0] === 0.05,
+  )
 
   // Alpha must survive every operation untouched.
   const alphaIn = [...image].filter((_, i) => i % 4 === 3)

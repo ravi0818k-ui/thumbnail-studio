@@ -12,6 +12,7 @@ export default function HomeScreen() {
   const setScreen = useEditor((s) => s.setScreen)
   const openColorGuide = useEditor((s) => s.openColorGuide)
   const openFontGuide = useEditor((s) => s.openFontGuide)
+  const openFundamentals = useEditor((s) => s.openFundamentals)
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -69,6 +70,9 @@ export default function HomeScreen() {
           <div className="row" style={{ marginTop: 12, gap: 8 }}>
             <button className="btn" onClick={() => setScreen('templates')}>
               Start from a template
+            </button>
+            <button className="btn ghost" onClick={openFundamentals}>
+              Fundamentals
             </button>
             <button className="btn ghost" onClick={openColorGuide}>
               Colour psychology

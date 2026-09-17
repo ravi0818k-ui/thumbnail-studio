@@ -16,8 +16,8 @@ npm run fetch-model    # optional: self-host the background-removal model into p
 
 There is no test framework. `scripts/selftest.ts` is bundled by esbuild and run in Node; it uses a local
 `check(name, condition, detail)` helper and exits non-zero on failure. `scripts/python-tests.mjs` runs
-every `test_*.py` suite in turn (`test_enhance.py`, `test_score.py`) and reports them all even if one
-fails. To run one area, comment out
+every `test_*.py` suite in turn (`test_enhance.py`, `test_score.py`, `test_vision.py`) and reports them
+all even if one fails. To run one area, comment out
 sections or filter the output (`npm run selftest | sed -n '/brand preset/,$p'`); the whole suite takes
 about three seconds. The Python tests run directly: `python scripts/test_enhance.py`.
 
@@ -117,6 +117,7 @@ runs on every load. Projects saved by earlier versions are still out there in us
 | Image enhancement | `engine/pythonImage.ts` | `workers/pyImage.worker.ts` | Pyodide (CPython 3.14 + numpy + Pillow) from CDN, ~15 MB on first use. The pipeline is `src/python/enhance.py`, imported with `?raw`; the Pyodide FFI glue lives in the worker's `BRIDGE` string so the Python module stays plain CPython and stays testable. |
 | Object mask & blur | `engine/runFocus.ts` | same worker, `focus_blur` op | `select_object` grows a scribble into a mask; `focus_blur` softens one side of it. Pure helpers live in `engine/objectMask.ts`, away from the `?worker` import, as with the scorer. |
 | Thumbnail scoring | `engine/runScore.ts` | same worker, `analyze` request | `src/python/score.py` measures the rendered pixels at each platform's width and returns JSON. Shares the runtime with enhancement. |
+| The test report | `engine/runTest.ts` | same worker, `inspect` request | `src/python/vision.py` adds faces, subject/background separation, colour harmony and edge definition. One request returns both it and `score.analyze`, since both read the same frame. |
 
 **Python modules are written to Pyodide's filesystem and imported**, not exec'd into globals, so
 `score.py` can `import enhance` exactly as it does under desktop CPython — one environment, one set of
@@ -207,6 +208,43 @@ with no warnings, and every entry in `data/shortsTemplates.ts` must produce no f
 check. A layout that drifts outside the safe area, or paints an off-palette colour, fails the suite
 rather than shipping.
 
+### The test report ("Run a test")
+
+`TestDialog` is the report on one design, and it is built from **two halves that must not be merged**:
+
+- **Pixels** — `src/python/vision.py`. Skin-tone chrominance plus connected components for faces,
+  spectral saliency to split subject from background, a blur residual for background texture, WCAG
+  luminance for separation and edge definition, and HSV geometry for the colour relationship. It emits
+  ids, scores and raw values and knows no English, exactly like `score.py`.
+- **The scene** — `sceneReport` in `engine/thumbnailTest.ts`. Objects, brand marks, labels and text
+  properties come from the project, because the editor *knows* what it drew. Running a detector over
+  the pixels to recover a layer list the app already has would be slower and less accurate. The UI
+  states which tabs are read rather than measured (`GroupInfo.scene`).
+
+Four things hold it up:
+
+- **`CHECK_IDS` in `thumbnailTest.ts` must equal `vision.CHECKS`.** `test_vision.py` asserts the report
+  emits that tuple in that order and the selftest asserts every id has a label, a reading and a fix, so
+  a check added on one side fails the suite until the other catches up.
+- **Every reading is called with real extremes.** `CheckInfo.read` is interpolated straight into the
+  page; the selftest calls each one at 0, 0.5, 1 and 21 so a formatter cannot throw on a live report.
+- **What it cannot do is stated, not faked.** There is no trained model here, so facial *expression*
+  (the joy / sorrow / anger / surprise bars a cloud vision API prints) and content classification are
+  not derivable. `LIMITS` carries that text and the selftest requires it on both the faces and safe
+  search tabs. `safety` reports the skin-toned share of the frame and is labelled a measurement, not a
+  rating. **Do not add a confidence bar for something that was not measured.**
+- **Background texture is a blur residual, not a gradient.** A mean gradient calls a smooth left-to-
+  right ramp as busy as static, and a gradient is a perfectly good thumbnail background. It is also
+  measured at the working resolution and masked *afterwards* — masking first draws a hard edge along
+  the mask boundary and that edge then dominates the reading. Both mistakes are pinned by tests.
+
+The overall number is the mean of the **mobile** platform score and every vision check that could be
+measured; an unmeasurable check drops out rather than counting as zero, as in `score.analyze`.
+
+`vision.py` is the third module the worker writes to Pyodide's filesystem, so it is also the third in
+`scripts/verify-pyodide.mjs` — keep the bridge there in sync with the worker's, which is what catches
+FFI bugs.
+
 ### Brand presets
 
 `data/brands.ts` defines the `BrandPreset` shape and the registry. A brand is pure data — palette with
@@ -272,11 +310,38 @@ against `data/vivian.ts`, since a worked example that has drifted from the brand
 wrong thing. Entry points mirror the colour guide — `openFontGuide`/`closeFontGuide` with
 `fontsReturnTo`, from the home screen and the editor's view menu.
 
+### Thumbnail fundamentals
+
+`data/fundamentals.ts` is the third reference page and the broadest: research, emotion, story, the
+science of attention, the art, identity, the clutter test, the 3-second test, the checklist and the
+formula. `FundamentalsScreen` renders it and, like the other two, knows nothing the data file does not
+say.
+
+Two things are specific to it:
+
+- **The article it comes from also covers fonts and colour; this page does not.** Those two sections are
+  `CROSS_LINKS`, which open the existing guides — where a hue or a family can actually be applied to the
+  selection. A second copy of the colour table would be a second thing to keep true. `openGuide`
+  switches on the link's `id`, so the selftest pins `id === screen` and that the screen is one the
+  router has a case for; a stray id would silently open the wrong page.
+- **The checklist is stateful but deliberately not persisted.** It is a pass over one design, so a tick
+  carried into the next thumbnail would be worse than no tick. The heading prints `CHECKLIST_COUNT`,
+  which is counted from the list rather than written down, and ticks are keyed `group:item` — hence the
+  uniqueness check.
+
+It has nothing to apply, because its lessons are decisions rather than properties; that is why it has no
+selection-aware header. Entry points match the other guides — `openFundamentals`/`closeFundamentals`
+with `fundamentalsReturnTo`, from the home screen and the editor's view menu.
+
 ### Preview surfaces
 
 `data/previewSurfaces.ts` lists every placement the Preview dialog reproduces — one row per real YouTube
 surface, with the CSS width it gets there and a layout name. `PreviewDialog` maps over
-`groupedSurfaces(format)` and switches on `layout`; it holds no list of its own. Adding a placement is a
+`groupedSurfaces(format)` and switches on `layout`; it holds no list of its own. The `phone` layout
+draws the card inside a device frame, because a thumbnail with a status bar above it and the next video
+pressing in below reads differently from the same card floating on a desktop page — and that pressure
+is exactly what a desktop-sized preview hides. `TestDialog` shows its own phone view for the same
+reason, beside every test rather than behind a toggle. Adding a placement is a
 row in that file, and adding a *layout* means a new `case` in the dialog's `Surface` switch — the
 selftest checks every surface's layout is one the dialog renders, and that no surface is wider than its
 canvas (a preview that upscales misrepresents the design).

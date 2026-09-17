@@ -8,7 +8,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const TESTS = ['test_enhance.py', 'test_score.py'].map((name) => path.join(ROOT, 'scripts', name))
+const TESTS = ['test_enhance.py', 'test_score.py', 'test_vision.py'].map((name) => path.join(ROOT, 'scripts', name))
 
 for (const interpreter of ['python', 'python3', 'py']) {
   const probe = spawnSync(interpreter, ['-c', 'import numpy'], { encoding: 'utf8' })

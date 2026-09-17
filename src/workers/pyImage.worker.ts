@@ -2,6 +2,7 @@
 
 import enhanceSource from '../python/enhance.py?raw'
 import scoreSource from '../python/score.py?raw'
+import visionSource from '../python/vision.py?raw'
 
 // ---------------------------------------------------------------------------
 // Python image engine: CPython 3.14 compiled to WebAssembly (Pyodide) running
@@ -40,7 +41,21 @@ export interface PyAnalyzeRequest {
   params: { regions: number[][]; occlusion: Record<string, number[][]> }
 }
 
-export type PyRequest = PyInitRequest | PyRunRequest | PyAnalyzeRequest
+/**
+ * The full "Run a test" report: the platform score and the vision pass in one
+ * round trip, because both read the same rendered frame and rendering it twice
+ * to ask two questions would double the cost for nothing.
+ */
+export interface PyInspectRequest {
+  type: 'inspect'
+  id: number
+  width: number
+  height: number
+  buffer: ArrayBuffer
+  params: { regions: number[][]; occlusion: Record<string, number[][]> }
+}
+
+export type PyRequest = PyInitRequest | PyRunRequest | PyAnalyzeRequest | PyInspectRequest
 
 export interface PyProgress {
   type: 'progress'
@@ -92,6 +107,7 @@ from pyodide.ffi import to_js
 sys.path.insert(0, ${JSON.stringify(PY_DIR)})
 import enhance
 import score
+import vision
 
 _size = [0, 0]
 
@@ -113,6 +129,16 @@ def _analyze(buf, width, height, params_json):
     data = np.frombuffer(buf.to_py(), dtype=np.uint8).reshape(height, width, 4)
     params = json.loads(params_json)
     report = score.analyze(data, params.get("regions") or [], params.get("occlusion") or {})
+    return to_js(json.dumps(report))
+
+def _inspect(buf, width, height, params_json):
+    data = np.frombuffer(buf.to_py(), dtype=np.uint8).reshape(height, width, 4)
+    params = json.loads(params_json)
+    regions = params.get("regions") or []
+    report = {
+        "score": score.analyze(data, regions, params.get("occlusion") or {}),
+        "vision": vision.inspect(data, regions),
+    }
     return to_js(json.dumps(report))
 `
 
@@ -146,6 +172,7 @@ async function boot(): Promise<Pyodide> {
     instance.FS.mkdirTree(PY_DIR)
     instance.FS.writeFile(`${PY_DIR}/enhance.py`, enhanceSource, { encoding: 'utf8' })
     instance.FS.writeFile(`${PY_DIR}/score.py`, scoreSource, { encoding: 'utf8' })
+    instance.FS.writeFile(`${PY_DIR}/vision.py`, visionSource, { encoding: 'utf8' })
     instance.runPython(BRIDGE)
     pyodide = instance
     report('Python engine ready', true)
@@ -189,10 +216,10 @@ ctx.onmessage = async (event: MessageEvent<PyRequest>) => {
       await boot()
       return
     }
-    if (message.type === 'analyze') {
+    if (message.type === 'analyze' || message.type === 'inspect') {
       const instance = await boot()
       const started = Date.now()
-      const analyze = instance.globals.get('_analyze') as (
+      const analyze = instance.globals.get(message.type === 'inspect' ? '_inspect' : '_analyze') as (
         buffer: Uint8Array,
         width: number,
         height: number,
@@ -241,7 +268,7 @@ ctx.onmessage = async (event: MessageEvent<PyRequest>) => {
   } catch (error) {
     ctx.postMessage({
       type: 'error',
-      id: message.type === 'run' || message.type === 'analyze' ? message.id : undefined,
+      id: message.type === 'init' ? undefined : message.id,
       message: error instanceof Error ? error.message : String(error),
     } satisfies PyError)
   }
