@@ -106,6 +106,48 @@ export default function HomeScreen() {
               </div>
             ))}
           </div>
+
+          <h2 className="h2">About Thumbnail Studio</h2>
+          <div className="about">
+            <p>
+              Thumbnail Studio is a free thumbnail designer for YouTube — horizontal thumbnails at 1280 × 720 and
+              vertical Shorts covers at 1080 × 1920. Cutting out a background, enhancing a photo, checking a design
+              against a brand's rules and exporting the finished file all run as code inside this page. There is no
+              server doing the work, and no account to create.
+            </p>
+
+            <h3>Your designs stay on your device</h3>
+            <ul>
+              <li>
+                <b>Nothing is uploaded.</b> A photo you add is decoded in the browser and used from memory. It is never
+                sent anywhere.
+              </li>
+              <li>
+                <b>Projects are saved locally</b> in this browser's own storage, on this device only. Nobody else can
+                read them, and clearing your site data deletes them for good — so keep exports of work you want to
+                keep.
+              </li>
+              <li>
+                <b>Exports are made here too.</b> The PNG or JPEG is drawn in the page and handed straight to your
+                downloads.
+              </li>
+            </ul>
+
+            <h3>What is measured</h3>
+            <p>
+              Anonymous usage statistics, through Google Analytics: which pages get opened, roughly which country, what
+              kind of device. That is the whole list. Your images, your text, your designs and your project names are
+              never part of it, because they never leave the browser in the first place.
+            </p>
+
+            <h3>What gets downloaded</h3>
+            <p>
+              Fonts come from Google Fonts. Two optional features fetch what they need from a public CDN the first time
+              you use them: the AI background-removal model, and the Python image engine behind the stronger enhance
+              tools. Those are ordinary downloads <em>to</em> your browser — no part of your design is sent with the
+              request. Once they are cached, the editor keeps working offline.
+            </p>
+          </div>
         </div>
       </div>
     </div>
