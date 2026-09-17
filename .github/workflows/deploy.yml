@@ -12,7 +12,11 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # Never cancel a deploy in flight. A build killed part-way uploads no
+  # artifact, and Pages then keeps serving — or rolls back to — an older
+  # one, which is how the site ended up on a build that still used the
+  # /thumbnail-studio/ base after the move to the domain root.
+  cancel-in-progress: false
 
 jobs:
   build:
