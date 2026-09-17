@@ -1,0 +1,15 @@
+node_modules
+dist
+.vite
+*.local
+.DS_Store
+
+# Self-hosted background-removal model (npm run fetch-model)
+public/bg-model
+
+# Python bytecode from the local test run
+__pycache__/
+*.pyc
+
+# Incremental TypeScript build state
+tsconfig.tsbuildinfo
