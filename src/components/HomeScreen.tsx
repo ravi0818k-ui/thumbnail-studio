@@ -11,6 +11,7 @@ export default function HomeScreen() {
   const loadProject = useEditor((s) => s.loadProject)
   const setScreen = useEditor((s) => s.setScreen)
   const openColorGuide = useEditor((s) => s.openColorGuide)
+  const openFontGuide = useEditor((s) => s.openFontGuide)
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -71,6 +72,9 @@ export default function HomeScreen() {
             </button>
             <button className="btn ghost" onClick={openColorGuide}>
               Colour psychology
+            </button>
+            <button className="btn ghost" onClick={openFontGuide}>
+              Choosing a font
             </button>
           </div>
 

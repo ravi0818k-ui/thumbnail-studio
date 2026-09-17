@@ -23,7 +23,7 @@ import { DEFAULT_EXPORT, type ExportSettings } from '../engine/export'
 import { DEFAULT_FOCUS, type FocusOptions, type FocusSelection } from '../engine/objectMask'
 import type { TemplateDef } from '../data/templates'
 
-export type Screen = 'home' | 'templates' | 'editor' | 'colors'
+export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts'
 export type GridMode = 'none' | 'grid' | 'thirds' | 'center'
 /**
  * 'clean' hands the stroke to the Python matte pass instead of erasing, and
@@ -41,6 +41,7 @@ export interface EditorState {
   screen: Screen
   /** Where the colour guide returns to, so it can be opened from either side. */
   colorsReturnTo: Screen
+  fontsReturnTo: Screen
   project: Project
   selection: string[]
   past: Snapshot[]
@@ -76,6 +77,8 @@ export interface EditorState {
   setScreen: (screen: Screen) => void
   openColorGuide: () => void
   closeColorGuide: () => void
+  openFontGuide: () => void
+  closeFontGuide: () => void
   setPanel: (panel: PanelId | null) => void
   newProject: (options?: NewProjectOptions) => void
   setFormat: (format: CanvasFormat) => void
@@ -195,6 +198,7 @@ export const useEditor = create<EditorState>((set, get) => {
   return {
     screen: 'home',
     colorsReturnTo: 'home',
+    fontsReturnTo: 'home',
     project: emptyProject(),
     selection: [],
     past: [],
@@ -227,6 +231,8 @@ export const useEditor = create<EditorState>((set, get) => {
     openColorGuide: () =>
       set((s) => (s.screen === 'colors' ? {} : { screen: 'colors', colorsReturnTo: s.screen })),
     closeColorGuide: () => set((s) => ({ screen: s.colorsReturnTo })),
+    openFontGuide: () => set((s) => (s.screen === 'fonts' ? {} : { screen: 'fonts', fontsReturnTo: s.screen })),
+    closeFontGuide: () => set((s) => ({ screen: s.fontsReturnTo })),
     setPanel: (panel) => set((s) => ({ panel: s.panel === panel ? null : panel })),
 
     newProject: (options = {}) => {

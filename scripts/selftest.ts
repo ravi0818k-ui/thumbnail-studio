@@ -1422,6 +1422,80 @@ console.log('colour psychology')
   check('an unknown word finds nothing', cp.searchColorMeanings('zzzz').length === 0)
 }
 
+// ------------------------------------------------------- font psychology ---
+console.log('font psychology')
+{
+  const fp = await import('../src/data/fontPsychology')
+  const { FONTS } = await import('../src/data/fonts')
+  const { INK, LIGHT, YELLOW } = await import('../src/data/vivian')
+
+  check('every category is listed', fp.FONT_CATEGORY_MEANINGS.length === 5, String(fp.FONT_CATEGORY_MEANINGS.length))
+  check('ids are unique', new Set(fp.FONT_CATEGORY_MEANINGS.map((c) => c.id)).size === 5)
+  check('names are unique', new Set(fp.FONT_CATEGORY_MEANINGS.map((c) => c.name)).size === 5)
+  check(
+    'every category says something on all four axes',
+    fp.FONT_CATEGORY_MEANINGS.every(
+      (c) => c.primary.length > 0 && c.secondary.length > 0 && c.uses.length > 0 && c.examples.length > 0,
+    ),
+  )
+  check(
+    'every category has a specimen to render',
+    fp.FONT_CATEGORY_MEANINGS.every((c) => c.specimen.trim().length > 0),
+  )
+
+  // The load-bearing one: the guide names families as things you can apply, so
+  // a name the picker does not offer is advice that dead-ends.
+  const known = new Set(FONTS.map((f) => f.family))
+  const unknown = fp.FONT_CATEGORY_MEANINGS.flatMap((c) => c.families).filter((f) => !known.has(f))
+  check('every recommended family is in the font list', unknown.length === 0, unknown.join(', '))
+  check('the worked system uses real families', fp.FONT_SYSTEM.every((r) => known.has(r.family)))
+  check(
+    'a category with families resolves them',
+    fp.fontsInCategory(fp.FONT_CATEGORY_MEANINGS.find((c) => c.id === 'sans-serif')!).length > 0,
+  )
+  // Serif and slab are taught but not shippable, so they must fall to the
+  // system-specimen path rather than render an empty chip row.
+  check(
+    'serif and slab are marked unavailable',
+    fp.fontsInCategory(fp.FONT_CATEGORY_MEANINGS.find((c) => c.id === 'serif')!).length === 0 &&
+      fp.fontsInCategory(fp.FONT_CATEGORY_MEANINGS.find((c) => c.id === 'slab-serif')!).length === 0,
+  )
+
+  // Weight clamping ---------------------------------------------------------
+  // Anton ships one weight. Applying it to a 900 layer has to come down to 400
+  // or the canvas renders a synthetic bold that no export can reproduce.
+  check('a single-weight family clamps down', fp.nearestWeight('Anton', 900) === 400)
+  check('a family keeps a weight it has', fp.nearestWeight('Inter', 900) === 900)
+  check('the nearest weight wins', fp.nearestWeight('Montserrat', 400) === 700)
+  check('an unknown family keeps the weight', fp.nearestWeight('Nonesuch', 612) === 612)
+  check('every weight feeling is a real step', fp.WEIGHT_FEELINGS.every((w) => w.weight >= 100 && w.weight <= 900))
+  check(
+    'the weight ramp only goes up',
+    fp.WEIGHT_FEELINGS.every((w, i, all) => i === 0 || all[i - 1].weight < w.weight),
+  )
+
+  // The worked pairing quotes the charcoal preset. If that brand's palette is
+  // re-tuned, the example teaches a colour the brand no longer uses.
+  check('the pairing ground is the charcoal preset', fp.PAIRING_GROUND === INK)
+  check(
+    'the pairing quotes the preset palette',
+    fp.PAIRING_EXAMPLE.map((p) => p.hex).join() === [LIGHT, YELLOW].join(),
+  )
+
+  check('the formula runs topic to size', fp.FORMULA_STEPS.map((s) => s.step).join() === 'Topic,Emotion,Category,Font,Weight,Size')
+
+  // Search ------------------------------------------------------------------
+  check('an empty query is every category', fp.searchFontCategories('   ').length === 5)
+  const luxury = fp.searchFontCategories('luxury')
+  check('a feeling finds its category', luxury.length === 1 && luxury[0].id === 'serif')
+  check('a use finds its category', fp.searchFontCategories('gaming').map((c) => c.id).join() === 'display')
+  check('search ignores case', fp.searchFontCategories('EDUCATION').length > 0)
+  check('a face can be searched for', fp.searchFontCategories('georgia').map((c) => c.id).join() === 'serif')
+  check('an unknown word finds nothing', fp.searchFontCategories('zzzz').length === 0)
+  check('an empty query is every topic', fp.searchTopics('').length === fp.TOPIC_DIRECTIONS.length)
+  check('a topic can be looked up', fp.searchTopics('memory').length > 0)
+}
+
 // ------------------------------------------------------------ brand: Vivian ---
 console.log('brand preset: vivian')
 {

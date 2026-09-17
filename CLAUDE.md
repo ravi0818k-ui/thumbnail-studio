@@ -249,6 +249,29 @@ hue can be applied to the selection in place. Applying maps by layer type: text 
 takes `fill`, an icon takes `effects.overlay` (its raster is black — the overlay *is* its colour), and a
 photograph is skipped, since recolouring one is a filter and not a fill.
 
+### Font psychology
+
+`data/fontPsychology.ts` is the typography counterpart and follows the colour guide exactly: five
+categories (serif, sans serif, script, display, slab serif) with what each says first, what it also
+says, where it is used and which faces a designer would name, plus the weight ramp, the topic → feeling
+→ direction table, the formula and the worked pairing. `FontScreen` is a renderer over that data and
+holds no typography knowledge of its own.
+
+Three things are load-bearing:
+
+- **`families` must name faces `FONTS` actually offers.** It is what the "apply" chips are built from, so
+  a family the picker does not have is advice that dead-ends. The selftest fails on an unknown name.
+- **Serif and slab serif ship no family**, because the library has none. They fall to `specimen` — a
+  system stack shown for teaching — and render `SPECIMEN_NOTE` instead of an empty chip row. Adding a
+  serif to `FONTS` (and to the Google Fonts URL in `index.html`) is what would make them applicable.
+- **`nearestWeight` clamps on apply.** Anton ships one weight, so dropping it on a 900 layer has to come
+  down to 400 or the canvas renders a synthetic bold that the export cannot reproduce.
+
+`PAIRING_GROUND`/`PAIRING_EXAMPLE` quote the charcoal preset's three values; the selftest checks them
+against `data/vivian.ts`, since a worked example that has drifted from the brand it cites teaches the
+wrong thing. Entry points mirror the colour guide — `openFontGuide`/`closeFontGuide` with
+`fontsReturnTo`, from the home screen and the editor's view menu.
+
 ### Preview surfaces
 
 `data/previewSurfaces.ts` lists every placement the Preview dialog reproduces — one row per real YouTube

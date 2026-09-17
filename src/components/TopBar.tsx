@@ -206,6 +206,14 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
               >
                 Colour psychology…
               </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  close()
+                  state.openFontGuide()
+                }}
+              >
+                Choosing a font…
+              </MenuItem>
             </>
           )
         }}

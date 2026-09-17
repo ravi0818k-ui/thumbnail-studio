@@ -933,6 +933,371 @@ input[type='range']::-moz-range-thumb {
   margin-bottom: 0;
 }
 
+/* ------------------------------------------------------ font psychology */
+/* Shares the .cp-* row shell with the colour guide; these are the pieces that
+   are specific to type — specimens, weight ramps and the worked examples. */
+
+.fp-principle {
+  margin: 18px 0 0;
+  padding: 14px 18px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fp-lead {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+  max-width: 720px;
+}
+
+.fp-note {
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 12px 0 0;
+  max-width: 720px;
+}
+
+.fp-closing {
+  margin: 34px 0 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+}
+
+.fp-signals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fp-signals li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.fp-signals li:last-child {
+  border-bottom: 0;
+}
+
+.fp-signals li span {
+  flex: 1;
+  color: var(--text);
+}
+
+.fp-signals li span:last-child {
+  text-align: right;
+}
+
+.fp-signals li em {
+  color: var(--text-faint);
+  font-style: normal;
+  font-size: 11px;
+}
+
+.fp-topics > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12px;
+}
+
+.fp-topics > div:last-child {
+  border-bottom: 0;
+}
+
+.fp-topics em {
+  font-style: normal;
+  color: var(--accent-2);
+}
+
+/* The specimen is the point of the card, so the identity column is wider here
+   than on the colour page, where it only had to hold a swatch — and the line
+   wraps rather than ellipsising, since half a specimen teaches nothing. */
+.fp-row {
+  grid-template-columns: 264px 1fr;
+}
+
+@media (max-width: 860px) {
+  .fp-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fp-specimen {
+  font-size: 23px;
+  line-height: 1.15;
+  color: var(--text);
+  padding: 4px 0 10px;
+  overflow-wrap: break-word;
+}
+
+.fp-tagline {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.fp-row .cp-cols {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 860px) {
+  .fp-row .cp-cols {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.fp-families {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.fp-chip {
+  font-size: 11px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text-dim);
+}
+
+button.fp-chip {
+  cursor: pointer;
+}
+
+button.fp-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.fp-unavailable {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.fp-weights {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.fp-weight {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 12px 14px;
+}
+
+.fp-weight-sample {
+  display: block;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.fp-weight b {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.fp-weight b .muted {
+  font-weight: 400;
+}
+
+.fp-weight > .muted {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.fp-treatments {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.fp-treatment {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 14px;
+}
+
+.fp-treatment > span:first-child {
+  display: block;
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.fp-treatment b {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.fp-treatment .muted {
+  font-size: 11px;
+}
+
+.fp-system {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.fp-role {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 16px 18px;
+}
+
+.fp-role-sample {
+  display: block;
+  font-size: 24px;
+  line-height: 1.15;
+  color: var(--text);
+  margin: 8px 0 6px;
+}
+
+.fp-role b {
+  font-size: 13px;
+}
+
+.fp-role ul {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.fp-role .btn {
+  margin-top: 12px;
+}
+
+/* The pairing sits on the charcoal ground it is written for, so it must define
+   its own colours rather than inherit the editor's. */
+.fp-pairing {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fp-pairing span {
+  display: block;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.fp-pairing em {
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.fp-tree > div {
+  display: grid;
+  grid-template-columns: 180px 20px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.fp-tree > div:last-child {
+  border-bottom: 0;
+}
+
+.fp-tree span {
+  color: var(--text-faint);
+}
+
+.fp-tree em {
+  font-style: normal;
+  color: var(--accent-2);
+}
+
+.fp-formula {
+  list-style: none;
+  counter-reset: fp;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.fp-formula li {
+  counter-increment: fp;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 12px 14px;
+}
+
+.fp-formula li b {
+  display: block;
+  font-size: 13px;
+}
+
+.fp-formula li b::before {
+  content: counter(fp) '. ';
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.fp-formula li .muted {
+  font-size: 11px;
+}
+
+.fp-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fp-inputs span {
+  font-size: 12px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+}
+
 /* --------------------------------------------------------------- modal */
 
 .modal-backdrop {
