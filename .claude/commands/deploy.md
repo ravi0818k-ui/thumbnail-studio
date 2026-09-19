@@ -61,7 +61,7 @@ A green run is not proof. Check what is actually served:
 ```bash
 js=$(curl -s -L "https://youtubethumbnail.org/" | grep -o '/assets/index-[^"]*\.js')
 curl -sI "https://youtubethumbnail.org$js" | head -1      # must be 200
-curl -sI "https://youtubethumbnail.org/favicon.svg" | head -1
+curl -sI "https://youtubethumbnail.org/favicon.ico" | head -1
 ```
 
 Then confirm three things:
@@ -70,7 +70,7 @@ Then confirm three things:
    prefix is the old `base` in `vite.config.ts` and means a stale artifact is being served.
 2. The served bundle contains a **string unique to this change** (`curl -s -L "…$js" | grep -c "<text>"`).
    Pick a literal from what you just edited. This is the only check that proves the new code is live.
-3. `/favicon.svg` returns 200.
+3. `/favicon.ico` returns 200.
 
 ## 6. Report
 

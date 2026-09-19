@@ -1897,5 +1897,23 @@ console.log('brand preset: vivian')
   check('the cut-out treatment grades the photo gently', patch.adjustments?.contrast === 6 && patch.adjustments?.sharpness === 5)
 }
 
+
+// ------------------------------------------------------------- outbound links ---
+console.log('outbound links')
+{
+  const links = await import('../src/data/links')
+  const all = [links.FEEDBACK_FORM_URL, links.AUTHOR_LINKEDIN_URL]
+  // Every one of these is opened in a new tab from a control with no other
+  // affordance, so a typo is a dead end nobody can recover from inside the app.
+  check(
+    'every outbound link is an absolute https URL',
+    all.every((u) => /^https:\/\/\S+$/.test(u)),
+    all.join(' '),
+  )
+  check('the feedback link points at the form itself', links.FEEDBACK_FORM_URL.includes('/viewform'))
+  check('the author link is a LinkedIn profile', /linkedin\.com\/in\//.test(links.AUTHOR_LINKEDIN_URL))
+  check('the author is named', links.AUTHOR_NAME.trim().length > 0)
+}
+
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)
 process.exit(failures === 0 ? 0 : 1)

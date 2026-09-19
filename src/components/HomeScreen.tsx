@@ -5,6 +5,7 @@ import { deleteProject, listProjects } from '../storage/db'
 import { ensureAssets } from '../engine/assets'
 import { assetIdsOf } from '../storage/projects'
 import { FORMAT_LIST, formatConfig } from '../data/formats'
+import { AUTHOR_LINKEDIN_URL, AUTHOR_NAME, FEEDBACK_FORM_URL } from '../data/links'
 
 export default function HomeScreen() {
   const newProject = useEditor((s) => s.newProject)
@@ -35,7 +36,7 @@ export default function HomeScreen() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">▶</span>
+          <img className="brand-mark" src="/logo.png" alt="" width={26} height={26} />
           <span>Thumbnail Studio</span>
         </div>
         <div className="spacer" />
@@ -115,8 +116,27 @@ export default function HomeScreen() {
             ))}
           </div>
 
-          <h2 className="h2">About Thumbnail Studio</h2>
+          <h2 className="h2">About us</h2>
           <div className="about">
+            <h3 style={{ marginTop: 0 }}>Who made this</h3>
+            <p>
+              YouTubeThumbnail.org is a free and open-source project created by {AUTHOR_NAME}, a YouTuber and software
+              engineer (India).
+            </p>
+            <p>
+              From the start of his journey, Abhishek wanted a free tool that could do exactly what paid software does.
+              So he built YouTubeThumbnail.org, bringing together everything he learned from WebVeda and the Ankur team
+              into one tool.
+            </p>
+            <p>
+              Learn more about Abhishek on his{' '}
+              <a href={AUTHOR_LINKEDIN_URL} target="_blank" rel="noopener noreferrer">
+                LinkedIn profile
+              </a>
+              .
+            </p>
+
+            <h3>What it does</h3>
             <p>
               Thumbnail Studio is a free thumbnail designer for YouTube — horizontal thumbnails at 1280 × 720 and
               vertical Shorts covers at 1080 × 1920. Cutting out a background, enhancing a photo, checking a design
@@ -154,6 +174,16 @@ export default function HomeScreen() {
               you use them: the AI background-removal model, and the Python image engine behind the stronger enhance
               tools. Those are ordinary downloads <em>to</em> your browser — no part of your design is sent with the
               request. Once they are cached, the editor keeps working offline.
+            </p>
+
+            <h3>Questions, ideas and bugs</h3>
+            <p>
+              There is no support inbox behind this — it is one person's side project. Anything you want to report or
+              ask for goes through the{' '}
+              <a href={FEEDBACK_FORM_URL} target="_blank" rel="noopener noreferrer">
+                feedback form
+              </a>
+              , which is also the <b>Help</b> button at the foot of the editor's left rail.
             </p>
           </div>
         </div>

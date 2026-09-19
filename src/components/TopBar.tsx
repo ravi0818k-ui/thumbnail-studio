@@ -21,7 +21,7 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="brand-mark">▶</span>
+        <img className="brand-mark" src="/logo.png" alt="" width={26} height={26} />
         <span>Thumbnail Studio</span>
       </div>
 

@@ -357,6 +357,23 @@ only *types* from it, which keeps the cycle type-only. A `TemplateDef.build(widt
 `{background, objects}` built with `engine/factory.ts`; applying one switches the canvas to the
 template's `format` and adopts its `brand`.
 
+### Brand marks and outbound links
+
+The wordmark beside "Thumbnail Studio" is `public/logo.png`, trimmed from the source art in
+`src/Brand Logo/`. It is a PNG on transparency, so `.brand-mark` carries **no background** — a plate
+behind it would show as a square around the ribbon. The icon set in `public/` (`favicon.ico`, the two
+PNG sizes, `apple-touch-icon.png`, the two `android-chrome` sizes and `site.webmanifest`) comes from
+`src/favicon/`; it replaced a hand-drawn SVG of YouTube's own play button, which was a trademark this
+project has no licence to. Regenerating any of them means replacing the file in `src/` and copying it
+across — `public/` is what ships.
+
+`data/links.ts` holds every address the app sends someone to by hand. Two of them are used twice — the
+feedback form is both the rail's **Help** button and a line in About, the LinkedIn profile is both a
+credit and a link — and a URL that has drifted between two copies is a dead end for whoever clicks the
+stale one. The selftest checks each is an absolute `https` URL. Help is a link rather than a `PanelId`
+because it leaves the app; it sits at the foot of the rail (`margin-top: auto`) so it is never mistaken
+for a drawing tool, and opens in a new tab so an unsaved design is not replaced.
+
 ## Conventions
 
 - TypeScript is strict with `noUnusedLocals`/`noUnusedParameters` — an unused import fails the build.

@@ -3,6 +3,7 @@ import {
   IconBackground,
   IconBrand,
   IconElements,
+  IconHelp,
   IconIcons,
   IconLayers,
   IconTemplates,
@@ -10,6 +11,7 @@ import {
   IconUpload,
 } from './icons'
 import { formatConfig } from '../data/formats'
+import { FEEDBACK_FORM_URL } from '../data/links'
 
 const TOOLS: Record<PanelId, { label: string; Icon: typeof IconTemplates }> = {
   brand: { label: 'Brand', Icon: IconBrand },
@@ -45,6 +47,19 @@ export default function LeftToolbar() {
           </button>
         )
       })}
+      {/* Help is a link, not a panel: there is no support inbox behind this app,
+          so a question goes to a Google Form and opens in its own tab rather
+          than taking the creator away from an unsaved design. */}
+      <a
+        className="tool tool-help"
+        href={FEEDBACK_FORM_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Help, feedback and bug reports"
+      >
+        <IconHelp />
+        <span>Help</span>
+      </a>
     </nav>
   )
 }

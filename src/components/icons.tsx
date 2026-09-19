@@ -183,3 +183,11 @@ export const IconFlipV = (p: SVGProps<SVGSVGElement>) => (
     <path d="M7 15l5 6 5-6H7Z" />
   </svg>
 )
+
+export const IconHelp = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...svg(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.4 9.2a2.7 2.7 0 0 1 5.2.9c0 1.8-2.6 2.2-2.6 3.9" />
+    <path d="M12 17.3h.01" />
+  </svg>
+)

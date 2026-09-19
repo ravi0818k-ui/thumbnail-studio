@@ -120,15 +120,13 @@ textarea {
   padding-right: 6px;
 }
 
+/* The mark is the brand PNG on transparency, so it needs no plate behind it —
+   a background here would show as a square around the ribbon. */
 .brand-mark {
   width: 26px;
   height: 26px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, var(--accent), #ff8a5c);
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: 14px;
+  object-fit: contain;
+  display: block;
 }
 
 .menu {
@@ -331,6 +329,14 @@ textarea {
 .tool svg {
   width: 19px;
   height: 19px;
+}
+
+/* Pushed to the foot of the rail so it never sits among the drawing tools —
+   it leaves the app, and the rail is otherwise all panels. */
+.tool-help {
+  margin-top: auto;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 /* -------------------------------------------------------------- panels */
@@ -931,6 +937,15 @@ input[type='range']::-moz-range-thumb {
 
 .about > :last-child {
   margin-bottom: 0;
+}
+
+.about a {
+  color: var(--accent-2);
+  text-decoration: none;
+}
+
+.about a:hover {
+  text-decoration: underline;
 }
 
 /* ------------------------------------------------------ font psychology */
