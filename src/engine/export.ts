@@ -1,5 +1,5 @@
 import type { Project } from '../types'
-import { renderToCanvas } from './renderer'
+import { createCanvas, renderToCanvas } from './renderer'
 
 export type ExportFormat = 'png' | 'jpg' | 'webp'
 
@@ -21,7 +21,21 @@ const MIME: Record<ExportFormat, string> = {
 export function exportCanvas(project: Project, settings: ExportSettings): HTMLCanvasElement {
   // JPEG has no alpha, so a transparent export is only honoured for PNG/WebP.
   const transparent = settings.transparent && settings.format !== 'jpg'
-  return renderToCanvas(project, settings.scale, transparent)
+  const canvas = renderToCanvas(project, settings.scale, transparent)
+  return settings.format === 'jpg' ? flatten(canvas) : canvas
+}
+
+/**
+ * Composites onto white. An encoder given alpha it cannot store writes the
+ * transparent pixels as black, which is not what a blank banner looks like.
+ */
+function flatten(source: HTMLCanvasElement): HTMLCanvasElement {
+  const canvas = createCanvas(source.width, source.height)
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(source, 0, 0)
+  return canvas
 }
 
 export function exportBlob(project: Project, settings: ExportSettings): Promise<Blob> {
@@ -61,5 +75,5 @@ export function safeFilename(name: string, format: ExportFormat): string {
 /** Small preview stored alongside a project in IndexedDB. */
 export function projectThumbnail(project: Project, width = 320): string {
   const scale = width / project.width
-  return renderToCanvas(project, scale).toDataURL('image/jpeg', 0.7)
+  return flatten(renderToCanvas(project, scale)).toDataURL('image/jpeg', 0.7)
 }

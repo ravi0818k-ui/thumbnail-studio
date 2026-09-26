@@ -80,7 +80,7 @@ export function maskInset(mask: FeatherMask): number {
   return Math.max(0, mask.feather / 2 - mask.expand)
 }
 
-function createCanvas(w: number, h: number): HTMLCanvasElement {
+export function createCanvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas')
   c.width = Math.max(1, Math.ceil(w))
   c.height = Math.max(1, Math.ceil(h))
@@ -717,6 +717,8 @@ function drawBackground(ctx: Ctx, project: Project): void {
   const bg = project.background
   ctx.save()
   switch (bg.kind) {
+    case 'none':
+      break
     case 'solid':
       ctx.fillStyle = bg.color
       ctx.fillRect(0, 0, w, h)

@@ -5,6 +5,7 @@ import ColorScreen from './components/ColorScreen'
 import FontScreen from './components/FontScreen'
 import FundamentalsScreen from './components/FundamentalsScreen'
 import TemplateScreen from './components/TemplateScreen'
+import GreenScreen from './components/GreenScreen'
 
 export default function App() {
   const screen = useEditor((s) => s.screen)
@@ -13,5 +14,6 @@ export default function App() {
   if (screen === 'colors') return <ColorScreen />
   if (screen === 'fonts') return <FontScreen />
   if (screen === 'fundamentals') return <FundamentalsScreen />
+  if (screen === 'greenscreen') return <GreenScreen />
   return <Editor />
 }

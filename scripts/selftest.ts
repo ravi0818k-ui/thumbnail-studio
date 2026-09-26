@@ -698,6 +698,154 @@ console.log('shorts format')
 }
 
 // ---------------------------------------------------------- brand: Brand 1 ---
+console.log('banner format')
+{
+  const { FORMATS, FORMAT_LIST, guideRect, innermostGuide, safeZoneRects, visibleGuides } = await import('../src/data/formats')
+  const { normalizeProject } = await import('../src/engine/normalize')
+  const { analyzeDesign, croppedOn } = await import('../src/engine/designAssistant')
+  const { DEFAULT_BACKGROUND, DEFAULT_GUIDE_VISIBILITY } = await import('../src/types')
+  const { useEditor } = await import('../src/store/editorStore')
+
+  const banner = FORMATS.banner
+  check('banner is listed as a format', FORMAT_LIST.some((f) => f.id === 'banner'))
+  check('banner is 2560 × 1440', banner.width === 2560 && banner.height === 1440)
+  check('banner has one size and cannot be resized', banner.presets.length === 1 && !banner.resizable)
+  check('banner starts blank', banner.background === 'none')
+  check('banner is not scored as a thumbnail', !banner.scored)
+  check('thumbnails and Shorts have no device guides', !FORMATS.thumbnail.guides && !FORMATS.shorts.guides)
+
+  // YouTube's published sizes, outermost first.
+  const guides = banner.guides ?? []
+  const spec: Record<string, [number, number]> = {
+    tv: [2560, 1440],
+    desktop: [2560, 430],
+    tablet: [1855, 423],
+    mobile: [1546, 423],
+  }
+  check('four device guides', guides.map((g) => g.id).join(',') === 'tv,desktop,tablet,mobile')
+  check('guide sizes match the YouTube spec', guides.every((g) => spec[g.id][0] === g.width && spec[g.id][1] === g.height))
+  const rects = guides.map((g) => guideRect(g, banner.width, banner.height))
+  check(
+    'every guide is centred',
+    rects.every((r) => near(r.x * 2 + r.width, banner.width) && near(r.y * 2 + r.height, banner.height)),
+  )
+  check(
+    'guides nest: mobile inside tablet inside desktop inside TV',
+    rects.every((r, i) => {
+      const inner = rects[i + 1]
+      return (
+        !inner ||
+        (inner.x >= r.x && inner.y >= r.y && inner.x + inner.width <= r.x + r.width && inner.y + inner.height <= r.y + r.height)
+      )
+    }),
+  )
+  check('TV is the whole canvas', rects[0].x === 0 && rects[0].y === 0 && rects[0].width === banner.width)
+  check('guide labels are distinct', new Set(guides.map((g) => g.label)).size === guides.length)
+  check('the innermost guide is mobile', innermostGuide('banner')?.id === 'mobile' && innermostGuide('thumbnail') === null)
+
+  // The inset safe zone the composition checks read is the mobile band itself.
+  const { safe, warning } = safeZoneRects(banner.safeZone, banner.width, banner.height)
+  const mobile = rects[rects.length - 1]
+  check(
+    'banner safe zone equals the mobile band',
+    near(safe.x, mobile.x) && near(safe.y, mobile.y) && near(safe.width, mobile.width) && near(safe.height, mobile.height),
+    JSON.stringify(safe),
+  )
+  check('banner has no warning band', near(safe.width, warning.width))
+
+  // Per-project visibility, defaulting to all on (FR7).
+  const bannerProject = (objects: SceneObject[], extra: Partial<Project> = {}): Project => ({
+    id: 'b',
+    name: 'Banner',
+    format: 'banner',
+    brandId: null,
+    width: 2560,
+    height: 1440,
+    safeZone: { ...banner.safeZone },
+    guides: { ...DEFAULT_GUIDE_VISIBILITY },
+    background: { ...DEFAULT_BACKGROUND, kind: 'none' },
+    objects,
+    createdAt: 0,
+    updatedAt: 0,
+    ...extra,
+  })
+  check('every guide is on by default', visibleGuides(bannerProject([])).length === 4)
+  check(
+    'a guide switched off is hidden',
+    visibleGuides(bannerProject([], { guides: { ...DEFAULT_GUIDE_VISIBILITY, tablet: false } }))
+      .map((g) => g.id)
+      .join(',') === 'tv,desktop,mobile',
+  )
+  const legacy = bannerProject([]) as Partial<Project>
+  delete legacy.guides
+  check('a project saved without guides shows them all', visibleGuides(legacy as Project).length === 4)
+  check('normalize gives old projects every guide', Object.values(normalizeProject(legacy as Project).guides).every(Boolean))
+  check(
+    'normalize keeps a saved choice',
+    normalizeProject(bannerProject([], { guides: { ...DEFAULT_GUIDE_VISIBILITY, mobile: false } })).guides.mobile === false,
+  )
+  check('normalize keeps a banner a banner', normalizeProject(legacy as Project).format === 'banner')
+
+  // Crop warnings (FR10): which devices cut into a layer.
+  const at = (x: number, y: number, w: number, h: number) => createText({ text: 'Channel', x, y, width: w, height: h })
+  const centred = at(1000, 600, 560, 200)
+  const pastMobile = at(400, 600, 1700, 200) // inside tablet (352 to 2207), past mobile (507 to 2053)
+  const nearEdge = at(100, 600, 300, 200)
+  const aboveTheBand = at(1000, 200, 400, 150)
+  const ids = (o: SceneObject) =>
+    croppedOn(bannerProject([o]), o)
+      .map((g) => g.id)
+      .join(',')
+  check('a centred name is visible everywhere', ids(centred) === '')
+  check('past the mobile edge warns for mobile only', ids(pastMobile) === 'mobile', ids(pastMobile))
+  check('near the left edge warns for tablet and mobile', ids(nearEdge) === 'tablet,mobile', ids(nearEdge))
+  check('above the band is TV-only', ids(aboveTheBand) === 'desktop,tablet,mobile', ids(aboveTheBand))
+  const backdrop = createImage('a', 2560, 1440, 2560, 1440, { x: 0, y: 0, width: 2560, height: 1440 })
+  const logo = createImage('a', 200, 200, 2560, 1440, { x: 40, y: 40, width: 200, height: 200 })
+  check('a logo in the corner warns', ids(logo) === 'desktop,tablet,mobile', ids(logo))
+  check('backdrop art over the whole band never warns', ids(backdrop) === '')
+  check('shapes never warn', ids(createShape({ x: 0, y: 0, width: 200, height: 200 })) === '')
+  check(
+    'thumbnails never get crop warnings',
+    croppedOn({ ...bannerProject([nearEdge]), format: 'thumbnail' }, nearEdge).length === 0,
+  )
+
+  const report = analyzeDesign(bannerProject([centred, pastMobile]))
+  const safeArea = report.checks.find((c) => c.id === 'safe-area')
+  check('composition check fails text outside the mobile band', safeArea?.status === 'fail', safeArea?.detail)
+  check('it names the device', !!safeArea?.detail.includes('mobile'), safeArea?.detail)
+  check('a banner has no bottom-row check', !report.checks.some((c) => c.id === 'bottom'))
+  check(
+    'a centred banner passes the band check',
+    analyzeDesign(bannerProject([centred])).checks.find((c) => c.id === 'safe-area')?.status === 'pass',
+  )
+
+  // Store: a new banner opens right, and its guides are a view setting.
+  useEditor.getState().newProject({ format: 'banner' })
+  let state = useEditor.getState()
+  check('new banner is 2560 × 1440', state.project.width === 2560 && state.project.height === 1440)
+  check('new banner has a transparent background', state.project.background.kind === 'none')
+  check('new banner opens on a panel it has', banner.toolbar.includes(state.panel!), String(state.panel))
+  check('new banner shows every guide', Object.values(state.project.guides).every(Boolean))
+  state.setCanvasSize(1280, 720)
+  state = useEditor.getState()
+  check('a banner cannot be resized', state.project.width === 2560 && state.project.format === 'banner')
+
+  state.addObject(centred)
+  useEditor.getState().toggleDeviceGuide('mobile')
+  check('toggling a guide flips it', useEditor.getState().project.guides.mobile === false)
+  check('toggling a guide leaves the others', useEditor.getState().project.guides.tablet === true)
+  check('toggling a guide is saved', useEditor.getState().dirty)
+  useEditor.getState().undo()
+  check('undo does not bring a guide back', useEditor.getState().project.guides.mobile === false)
+  check('undo still undoes the edit', useEditor.getState().project.objects.length === 0)
+  useEditor.getState().toggleDeviceGuide('mobile')
+  check('toggling again restores it', useEditor.getState().project.guides.mobile === true)
+  useEditor.getState().newProject({ format: 'thumbnail' })
+  check('thumbnails still start solid', useEditor.getState().project.background.kind === 'solid')
+  check('thumbnails still open on templates', useEditor.getState().panel === 'templates')
+}
+
 console.log('brand preset: super learner')
 {
   const { SUPER_LEARNER, LAYOUT } = await import('../src/data/superLearner')
@@ -1038,11 +1186,13 @@ console.log('run a test')
   console.log('preview surfaces')
   const { FORMATS } = await import('../src/data/formats')
   const { surfacesFor, groupedSurfaces, smallestSurface } = await import('../src/data/previewSurfaces')
-  const LAYOUTS = ['grid', 'row', 'feature', 'bare', 'immersive', 'tv', 'phone']
-  for (const format of ['thumbnail', 'shorts'] as const) {
+  const LAYOUTS = ['grid', 'row', 'feature', 'bare', 'immersive', 'tv', 'phone', 'banner']
+  for (const format of ['thumbnail', 'shorts', 'banner'] as const) {
     const surfaces = surfacesFor(format)
     const config = FORMATS[format]
-    check(`${format}: surfaces are defined`, surfaces.length >= 5, String(surfaces.length))
+    // A banner has one surface per device; a card format needs the full spread of sizes.
+    const expected = config.guides ? config.guides.length : 5
+    check(`${format}: surfaces are defined`, surfaces.length >= expected, String(surfaces.length))
     check(`${format}: ids are unique`, new Set(surfaces.map((s) => s.id)).size === surfaces.length)
     check(`${format}: every layout is one the dialog renders`, surfaces.every((s) => LAYOUTS.includes(s.layout)))
     // A preview that upscales is a lie about how the design will be seen.
@@ -1071,6 +1221,25 @@ console.log('run a test')
       !surfacesFor('thumbnail').some((s) => s.layout === 'immersive'),
   )
   check('a thumbnail is previewed down to 100 px or less', smallestSurface('thumbnail').width <= 100)
+
+  // A banner surface is a crop, so it must name a real guide and never upscale that crop.
+  const bannerGuides = FORMATS.banner.guides ?? []
+  check(
+    'every banner surface shows a real device guide',
+    surfacesFor('banner').every((s) => s.layout === 'banner' && bannerGuides.some((g) => g.id === s.guide)),
+  )
+  check(
+    'no banner surface is wider than its crop',
+    surfacesFor('banner').every((s) => s.width <= bannerGuides.find((g) => g.id === s.guide)!.width),
+  )
+  check(
+    'every banner guide has a preview',
+    bannerGuides.every((g) => surfacesFor('banner').some((s) => s.guide === g.id)),
+  )
+  check(
+    'only banners use the banner layout',
+    !surfacesFor('thumbnail').concat(surfacesFor('shorts')).some((s) => s.layout === 'banner'),
+  )
 }
 
 // ------------------------------------------------------------ feather mask
@@ -1913,6 +2082,42 @@ console.log('outbound links')
   check('the feedback link points at the form itself', links.FEEDBACK_FORM_URL.includes('/viewform'))
   check('the author link is a LinkedIn profile', /linkedin\.com\/in\//.test(links.AUTHOR_LINKEDIN_URL))
   check('the author is named', links.AUTHOR_NAME.trim().length > 0)
+}
+
+// -------------------------------------------------------------- green screen ---
+console.log('green screen')
+{
+  const gs = await import('../src/data/greenScreen')
+  const { readFileSync } = await import('node:fs')
+
+  check('green and blue are the first two presets', gs.BACKDROP_PRESETS.slice(0, 2).map((p) => p.id).join() === 'green,blue')
+  check('the default backdrop is chroma green', gs.DEFAULT_BACKDROP.hex === '#00B140')
+  // The swatch highlight compares with ===, so a lowercase preset would never light up.
+  check(
+    'every preset is already a normalised hex',
+    gs.BACKDROP_PRESETS.every((p) => gs.normalizeHex(p.hex) === p.hex),
+  )
+  check('preset ids are unique', new Set(gs.BACKDROP_PRESETS.map((p) => p.id)).size === gs.BACKDROP_PRESETS.length)
+  check('a short hex expands', gs.normalizeHex('0f0') === '#00FF00')
+  check('a hex without # is accepted', gs.normalizeHex(' 00b140 ') === '#00B140')
+  check('a non-hex is refused', gs.normalizeHex('#00b14') === null && gs.normalizeHex('green') === null)
+  check(
+    'resolutions run 720p to 4K, all 16:9',
+    gs.BACKDROP_RESOLUTIONS.map((r) => r.id).join() === '720p,1080p,1440p,4k' &&
+      gs.BACKDROP_RESOLUTIONS.every((r) => r.width * 9 === r.height * 16),
+  )
+  const phone = gs.detectedResolution(390, 844, 3)
+  check('a portrait phone is reported landscape-first', phone.width === 2532 && phone.height === 1170)
+  check('a 1.25x laptop rounds to whole pixels', gs.detectedResolution(1536, 864, 1.25).width === 1920)
+  check('a missing pixel ratio counts as 1', gs.detectedResolution(1280, 720, 0).width === 1280)
+  check('a 1080p screen picks 1080p', gs.nearestResolution(1920, 1080).id === '1080p')
+  check('a 5K screen picks 4K', gs.nearestResolution(5120, 2880).id === '4k')
+
+  // FR11: the backdrop only paints a colour. A camera or microphone call here
+  // would put a permission prompt in front of someone who asked for neither.
+  // Resolved from the working directory: the bundle runs from node_modules/.cache.
+  const source = readFileSync('src/components/GreenScreen.tsx', 'utf8')
+  check('the backdrop never asks for the camera or microphone', !/getUserMedia|mediaDevices|getDisplayMedia/.test(source))
 }
 
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)

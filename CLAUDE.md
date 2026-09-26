@@ -29,11 +29,31 @@ there surfaces only when the script runs.
 React + TypeScript + Vite + Zustand. No backend: editing, background removal, image enhancement,
 project storage and export all happen in the browser.
 
-### One engine, two products
+### One engine, three products
 
-`src/data/formats.ts` is the **only** place the horizontal thumbnail (1280×720) and the vertical Shorts
-cover (1080×1920) differ — canvas size and presets, safe-zone insets, left-toolbar order, export copy.
-Everything else is shared. Add a format by adding an entry there, not by branching in components.
+`src/data/formats.ts` is the **only** place the horizontal thumbnail (1280×720), the vertical Shorts
+cover (1080×1920) and the channel banner (2560×1440) differ — canvas size and presets, safe-zone insets,
+left-toolbar order, export copy, starting background, whether the canvas can be resized and whether the
+thumbnail scorer applies (`scored`). Everything else is shared. Add a format by adding an entry there,
+not by branching in components.
+
+**The banner is cropped, not covered**, so it carries `guides` (TV, desktop, tablet, mobile — YouTube's
+published sizes, centred, outermost first) instead of relying on inset percentages. Three things hold it
+together:
+
+- Its `safeZone` is *derived* from the innermost guide, so `designAssistant`, `thumbnailScore` and
+  anything else that reads `project.safeZone` treat the mobile band as the safe area with no second set
+  of numbers. `croppedOn(project, obj)` in `designAssistant.ts` is the one answer to "which devices cut
+  this layer" — the canvas warning chip and the composition check both call it. Shapes and layers
+  covering the whole mobile band are backdrop art and never warn.
+- `Project.guides` is which guides are switched on. It is per project so it survives a reload, but it
+  is a view setting: `toggleDeviceGuide` pushes no history, and `undo`/`redo` carry the current value
+  across rather than restoring the snapshot's.
+- The guides are drawn in `CanvasStage.drawDeviceGuides`, inside `drawOverlay` — above the art, below
+  the handles, never in an export. For a format with guides they replace the inset safe-zone overlay.
+
+A banner starts on `background.kind === 'none'` (transparent). JPEG cannot store alpha, so
+`exportCanvas` and `projectThumbnail` flatten onto white rather than letting the encoder write black.
 
 ### Rendering — the WYSIWYG invariant
 
@@ -333,9 +353,29 @@ It has nothing to apply, because its lessons are decisions rather than propertie
 selection-aware header. Entry points match the other guides — `openFundamentals`/`closeFundamentals`
 with `fundamentalsReturnTo`, from the home screen and the editor's view menu.
 
+### Green screen backdrop
+
+`data/greenScreen.ts` + `components/GreenScreen.tsx` is a utility, not a design: it fills the screen with
+a flat chroma-key colour to prop up behind a subject. It is the `greenscreen` screen, opened from the
+home screen's **Tools** row and the editor's view menu (`openGreenScreen`/`closeGreenScreen`, with
+`greenScreenReturnTo`). Three things are load-bearing:
+
+- **The stage is always mounted and already painted**, hidden by CSS until it is the `:fullscreen`
+  element. `requestFullscreen` is called synchronously inside the click, so no render sits between the
+  gesture and the colour for a white frame to flash into.
+- **iPhone Safari has no element fullscreen**, so a refused or missing API falls back to `mode: 'page'`
+  — a fixed overlay with its own Esc handler and `theme-color` set to the backdrop.
+- **It never touches the camera or microphone.** The selftest greps the component for
+  `getUserMedia`/`mediaDevices`/`getDisplayMedia` and fails if any appear.
+
+The resolution picker only sizes the downloadable PNG (for a TV that cannot open the page); full screen
+always fills the display at its native size.
+
 ### Preview surfaces
 
-`data/previewSurfaces.ts` lists every placement the Preview dialog reproduces — one row per real YouTube
+`data/previewSurfaces.ts` lists every placement the Preview dialog reproduces (for a banner, one
+`banner` surface per device guide: `width` is then the width of that device's crop, and the whole canvas
+is drawn `canvas width / guide width` times wider) — one row per real YouTube
 surface, with the CSS width it gets there and a layout name. `PreviewDialog` maps over
 `groupedSurfaces(format)` and switches on `layout`; it holds no list of its own. The `phone` layout
 draws the card inside a device frame, because a thumbnail with a status bar above it and the next video

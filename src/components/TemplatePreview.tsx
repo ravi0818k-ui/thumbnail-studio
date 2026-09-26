@@ -3,6 +3,7 @@ import type { TemplateDef } from '../data/templates'
 import { renderToCanvas } from '../engine/renderer'
 import { useEditor } from '../store/editorStore'
 import { defaultSafeZone, formatConfig } from '../data/formats'
+import { DEFAULT_GUIDE_VISIBILITY } from '../types'
 
 /**
  * Template thumbnails come from the real renderer, so what the panel shows is
@@ -36,6 +37,7 @@ export default function TemplatePreview({ template, width = 260 }: { template: T
           width: canvasWidth,
           height: canvasHeight,
           safeZone: defaultSafeZone(format),
+          guides: { ...DEFAULT_GUIDE_VISIBILITY },
           background: built.background,
           objects: built.objects,
           createdAt: 0,

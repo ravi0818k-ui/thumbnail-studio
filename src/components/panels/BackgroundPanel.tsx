@@ -50,6 +50,7 @@ export default function BackgroundPanel() {
             setBackground({ kind })
           }}
           options={[
+            { value: 'none', label: 'None', title: 'Transparent — PNG and WEBP exports keep it' },
             { value: 'solid', label: 'Solid' },
             { value: 'gradient', label: 'Gradient' },
             { value: 'image', label: 'Image' },

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type {
   Background,
   CanvasFormat,
+  DeviceGuideId,
   ImageObject,
   Project,
   ProjectRecord,
@@ -10,7 +11,7 @@ import type {
   ShapeObject,
   TextObject,
 } from '../types'
-import { DEFAULT_BACKGROUND } from '../types'
+import { DEFAULT_BACKGROUND, DEFAULT_GUIDE_VISIBILITY } from '../types'
 import { defaultSafeZone, formatConfig, formatForSize } from '../data/formats'
 import { DEFAULT_BRAND_ID } from '../data/brands'
 import { normalizeProject } from '../engine/normalize'
@@ -23,7 +24,7 @@ import { DEFAULT_EXPORT, type ExportSettings } from '../engine/export'
 import { DEFAULT_FOCUS, type FocusOptions, type FocusSelection } from '../engine/objectMask'
 import type { TemplateDef } from '../data/templates'
 
-export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals'
+export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals' | 'greenscreen'
 export type GridMode = 'none' | 'grid' | 'thirds' | 'center'
 /**
  * 'clean' hands the stroke to the Python matte pass instead of erasing, and
@@ -43,6 +44,7 @@ export interface EditorState {
   colorsReturnTo: Screen
   fontsReturnTo: Screen
   fundamentalsReturnTo: Screen
+  greenScreenReturnTo: Screen
   project: Project
   selection: string[]
   past: Snapshot[]
@@ -83,10 +85,13 @@ export interface EditorState {
   closeFontGuide: () => void
   openFundamentals: () => void
   closeFundamentals: () => void
+  openGreenScreen: () => void
+  closeGreenScreen: () => void
   setPanel: (panel: PanelId | null) => void
   newProject: (options?: NewProjectOptions) => void
   setFormat: (format: CanvasFormat) => void
   setSafeZone: (patch: Partial<SafeZone>) => void
+  toggleDeviceGuide: (id: DeviceGuideId) => void
   setBrand: (brandId: string) => void
   resetSafeZone: () => void
   applyTemplate: (template: TemplateDef) => void
@@ -148,6 +153,18 @@ export interface EditorState {
   endCrop: (apply: boolean) => void
 }
 
+const NEW_NAMES: Record<CanvasFormat, string> = {
+  thumbnail: 'Untitled thumbnail',
+  shorts: 'Untitled Shorts cover',
+  banner: 'Untitled banner',
+}
+
+/** The panel a fresh project opens on: the gallery when the format has one. */
+function openingPanel(format: CanvasFormat): PanelId {
+  const toolbar = formatConfig(format).toolbar
+  return toolbar.includes('templates') ? 'templates' : toolbar[0]
+}
+
 const HISTORY_LIMIT = 80
 const COALESCE_MS = 500
 
@@ -164,13 +181,14 @@ function emptyProject(options: NewProjectOptions = {}): Project {
   const config = formatConfig(format)
   return {
     id: newId('p'),
-    name: options.name ?? (format === 'shorts' ? 'Untitled Shorts cover' : 'Untitled thumbnail'),
+    name: options.name ?? NEW_NAMES[format],
     format,
     brandId: options.brandId ?? DEFAULT_BRAND_ID,
     width: options.width ?? config.width,
     height: options.height ?? config.height,
     safeZone: defaultSafeZone(format),
-    background: JSON.parse(JSON.stringify(DEFAULT_BACKGROUND)),
+    guides: { ...DEFAULT_GUIDE_VISIBILITY },
+    background: { ...JSON.parse(JSON.stringify(DEFAULT_BACKGROUND)), kind: config.background },
     objects: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -205,6 +223,7 @@ export const useEditor = create<EditorState>((set, get) => {
     colorsReturnTo: 'home',
     fontsReturnTo: 'home',
     fundamentalsReturnTo: 'home',
+    greenScreenReturnTo: 'home',
     project: emptyProject(),
     selection: [],
     past: [],
@@ -243,6 +262,9 @@ export const useEditor = create<EditorState>((set, get) => {
     openFundamentals: () =>
       set((s) => (s.screen === 'fundamentals' ? {} : { screen: 'fundamentals', fundamentalsReturnTo: s.screen })),
     closeFundamentals: () => set((s) => ({ screen: s.fundamentalsReturnTo })),
+    openGreenScreen: () =>
+      set((s) => (s.screen === 'greenscreen' ? {} : { screen: 'greenscreen', greenScreenReturnTo: s.screen })),
+    closeGreenScreen: () => set((s) => ({ screen: s.greenScreenReturnTo })),
     setPanel: (panel) => set((s) => ({ panel: s.panel === panel ? null : panel })),
 
     newProject: (options = {}) => {
@@ -254,7 +276,7 @@ export const useEditor = create<EditorState>((set, get) => {
         past: [],
         future: [],
         screen: 'editor',
-        panel: 'templates',
+        panel: openingPanel(project.format),
         editingTextId: null,
         dirty: false,
         // Shorts is the format where the host UI actually eats the design.
@@ -286,6 +308,15 @@ export const useEditor = create<EditorState>((set, get) => {
     setSafeZone: (patch) => {
       mutate((p) => {
         p.safeZone = { ...p.safeZone, ...patch }
+      })
+    },
+
+    // A view setting, but one the project remembers, so it is saved without
+    // becoming an undo step (undo/redo carry the current value across).
+    toggleDeviceGuide: (id) => {
+      mutate((p) => {
+        const guides = { ...DEFAULT_GUIDE_VISIBILITY, ...p.guides }
+        p.guides = { ...guides, [id]: !guides[id] }
       })
     },
 
@@ -349,6 +380,8 @@ export const useEditor = create<EditorState>((set, get) => {
     renameProject: (name) => mutate((p) => void (p.name = name)),
 
     setCanvasSize: (width, height) => {
+      // A banner has exactly one upload size; every guide is measured from it.
+      if (!formatConfig(get().project.format).resizable) return
       get().pushHistory()
       invalidateRaster()
       const format = formatForSize(width, height)
@@ -606,7 +639,7 @@ export const useEditor = create<EditorState>((set, get) => {
       set({
         past: state.past.slice(0, -1),
         future: [snapshot(state), ...state.future].slice(0, HISTORY_LIMIT),
-        project: previous.project,
+        project: { ...previous.project, guides: state.project.guides },
         selection: previous.selection,
         editingTextId: null,
         dirty: true,
@@ -622,7 +655,7 @@ export const useEditor = create<EditorState>((set, get) => {
       set({
         past: [...state.past, snapshot(state)].slice(-HISTORY_LIMIT),
         future: state.future.slice(1),
-        project: next.project,
+        project: { ...next.project, guides: state.project.guides },
         selection: next.selection,
         editingTextId: null,
         dirty: true,

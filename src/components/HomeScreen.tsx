@@ -14,6 +14,7 @@ export default function HomeScreen() {
   const openColorGuide = useEditor((s) => s.openColorGuide)
   const openFontGuide = useEditor((s) => s.openFontGuide)
   const openFundamentals = useEditor((s) => s.openFundamentals)
+  const openGreenScreen = useEditor((s) => s.openGreenScreen)
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -46,8 +47,8 @@ export default function HomeScreen() {
         <div className="home-inner">
           <h1 className="hero-title">Create YouTube thumbnails faster.</h1>
           <p className="hero-sub">
-            Upload, cut out the background, add big readable text and download — horizontal thumbnails and vertical
-            Shorts covers, all in your browser.
+            Upload, cut out the background, add big readable text and download — horizontal thumbnails, vertical
+            Shorts covers and channel banners, all in your browser.
           </p>
           <h2 className="h2" style={{ marginTop: 26 }}>
             Create new design
@@ -80,6 +81,18 @@ export default function HomeScreen() {
             </button>
             <button className="btn ghost" onClick={openFontGuide}>
               Choosing a font
+            </button>
+          </div>
+
+          <h2 className="h2">Tools</h2>
+          <div className="format-cards">
+            <button className="format-card" onClick={openGreenScreen}>
+              <span className="tool-swatch" aria-hidden />
+              <span>
+                <b>Green screen backdrop</b>
+                <em>Chroma green · blue · custom</em>
+                <span className="muted">Turn this screen into a flat key colour to shoot B-roll against.</span>
+              </span>
             </button>
           </div>
 

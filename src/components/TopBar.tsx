@@ -167,14 +167,17 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
               >
                 Zoom to 100%
               </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  close()
-                  state.toggleSafeZone()
-                }}
-              >
-                {state.showSafeZone ? 'Hide' : 'Show'} safe zone
-              </MenuItem>
+              {/* A banner's device guides have their own checkboxes. */}
+              {!formatConfig(state.project.format).guides && (
+                <MenuItem
+                  onClick={() => {
+                    close()
+                    state.toggleSafeZone()
+                  }}
+                >
+                  {state.showSafeZone ? 'Hide' : 'Show'} safe zone
+                </MenuItem>
+              )}
               <MenuItem
                 onClick={() => {
                   close()
@@ -223,6 +226,14 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
               >
                 Choosing a font…
               </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  close()
+                  state.openGreenScreen()
+                }}
+              >
+                Green screen backdrop…
+              </MenuItem>
             </>
           )
         }}
@@ -247,13 +258,15 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
       <span className="save-state">
         {dirty ? 'Saving…' : lastSavedAt ? `Saved ${timeAgo(lastSavedAt)}` : 'Not saved yet'}
       </span>
-      <button
-        className="btn ghost"
-        onClick={() => setTestOpen(true)}
-        title="Score this design: faces, contrast, background, colour and text"
-      >
-        Run a test
-      </button>
+      {formatConfig(project.format).scored && (
+        <button
+          className="btn ghost"
+          onClick={() => setTestOpen(true)}
+          title="Score this design: faces, contrast, background, colour and text"
+        >
+          Run a test
+        </button>
+      )}
       <button className="btn ghost" onClick={() => setPreviewOpen(true)} title="Preview as a YouTube card">
         <IconEye /> Preview
       </button>

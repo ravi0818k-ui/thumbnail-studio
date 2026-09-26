@@ -3569,3 +3569,244 @@ button.fp-chip:hover {
   color: var(--text-dim);
   line-height: 1.5;
 }
+
+/* Banner crop warning: a status line over the canvas, never a modal — the
+   creator is mid-drag when it matters. */
+.crop-warning {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 20px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(20, 14, 4, 0.92);
+  border: 1px solid #f5a524;
+  color: #fde7b0;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.format-frame[data-format='banner'] > span {
+  position: relative;
+  width: 46px;
+  height: 26px;
+}
+
+/* The centred band every device keeps. */
+.format-frame[data-format='banner'] > span::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  top: 35%;
+  bottom: 35%;
+  border: 1px dashed var(--accent);
+}
+
+.guide-toggle {
+  padding: 5px 0;
+}
+
+.guide-toggle i {
+  width: 14px;
+  height: 10px;
+  border: 2px dashed;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.guide-toggle em {
+  margin-left: 6px;
+  font-style: normal;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Banner preview: the crop one device keeps, and the channel row under it. */
+.pv-channel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pv-banner {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  /* The checkerboard shows through a banner left transparent. */
+  background: repeating-conic-gradient(var(--pv-ghost) 0 25%, var(--pv-ghost-2) 0 50%) 0 0 / 16px 16px;
+}
+.pv-banner img {
+  position: absolute;
+  max-width: none;
+}
+.pv-body.gray .pv-banner img {
+  filter: grayscale(1);
+}
+.pv-avatar.large {
+  width: 56px;
+  height: 56px;
+}
+
+/* -------------------------------------------------------- green screen */
+/* The stage is mounted and painted the whole time, and only shown once it is
+   the fullscreen element (or `.on`, the in-page fallback). No render sits
+   between the click and the colour, so nothing white can flash in between. */
+
+.gs-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 22px;
+}
+
+@media (max-width: 760px) {
+  .gs-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gs-preview {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  max-height: 70vh;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: zoom-in;
+  padding: 14px;
+}
+
+.gs-preview span {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
+.gs-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.gs-swatch {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  column-gap: 8px;
+  align-items: center;
+  text-align: left;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+
+.gs-swatch.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.gs-swatch > span {
+  grid-row: span 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.gs-swatch b {
+  font-size: 12px;
+}
+
+.gs-swatch em {
+  font-size: 11px;
+  font-style: normal;
+  color: var(--text-faint);
+}
+
+.gs-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.gs-custom .input {
+  width: 110px;
+}
+
+.gs-note {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+
+.gs-tips {
+  color: var(--text-dim);
+  line-height: 1.7;
+  padding-left: 18px;
+}
+
+.gs-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.gs-stage:fullscreen,
+.gs-stage.on {
+  visibility: visible;
+  pointer-events: auto;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Kept apart from the rule above: a selector list with a pseudo-class the
+   browser does not know is dropped whole. */
+.gs-stage:-webkit-full-screen {
+  visibility: visible;
+  pointer-events: auto;
+  width: 100vw;
+  height: 100vh;
+}
+
+.gs-stage::backdrop {
+  background: var(--gs-color, #000);
+}
+
+.gs-stage.idle {
+  cursor: none;
+}
+
+.gs-exit {
+  position: absolute;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 14px;
+}
+
+.tool-swatch {
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #00b140 50%, #0047ab 50%);
+}

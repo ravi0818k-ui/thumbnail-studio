@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useEditor } from '../store/editorStore'
 import { Modal, Segmented, Toggle } from './ui'
 import { renderToCanvas } from '../engine/renderer'
-import type { TextObject } from '../types'
-import { groupedSurfaces, smallestSurface, type PreviewSurface } from '../data/previewSurfaces'
+import type { CanvasFormat, TextObject } from '../types'
+import { groupedSurfaces, smallestSurface, surfacesFor, type PreviewSurface } from '../data/previewSurfaces'
+import { formatConfig, guideRect } from '../data/formats'
 import ScoreCard from './ScoreCard'
 
 type Theme = 'dark' | 'light'
@@ -31,9 +32,14 @@ export default function PreviewDialog() {
   const [gray, setGray] = useState(false)
   const [title, setTitle] = useState(project.name)
 
+  const config = formatConfig(project.format)
+  const isBanner = !!config.guides
+
   useEffect(() => {
-    // 2× the widest surface, so nothing in here is upscaled.
-    setUrl(renderToCanvas(project, Math.min(2, 960 / project.width)).toDataURL('image/png'))
+    // 2× the widest surface, so nothing in here is upscaled. A banner surface
+    // shows a crop, so the whole image is drawn wider than the surface.
+    const widest = Math.max(...surfacesFor(project.format).map((s) => s.width * surfaceScale(s, project.format)))
+    setUrl(renderToCanvas(project, Math.min(2, Math.max(960, widest * 2) / project.width)).toDataURL('image/png'))
   }, [project])
 
   const groups = useMemo(() => groupedSurfaces(project.format), [project.format])
@@ -47,7 +53,8 @@ export default function PreviewDialog() {
       .map((o) => o.fontSize)
     return sizes.length > 0 ? Math.min(...sizes) : null
   }, [project.objects])
-  const renderedPx = smallestText === null ? null : (smallestText * smallest.width) / project.width
+  const renderedPx =
+    smallestText === null ? null : (smallestText * smallest.width * surfaceScale(smallest, project.format)) / project.width
 
   const shared = { url, title, theme, project }
 
@@ -57,7 +64,7 @@ export default function PreviewDialog() {
         <input
           className="input pv-title-input"
           value={title}
-          placeholder="Type the title you will publish with"
+          placeholder={isBanner ? 'Your channel name' : 'Type the title you will publish with'}
           onChange={(e) => setTitle(e.target.value)}
         />
         <Segmented
@@ -68,11 +75,11 @@ export default function PreviewDialog() {
             { value: 'light', label: 'Light', title: 'Where a light thumbnail can disappear into the page' },
           ]}
         />
-        <Toggle label="Competing videos" checked={neighbours} onChange={setNeighbours} />
+        {!isBanner && <Toggle label="Competing videos" checked={neighbours} onChange={setNeighbours} />}
         <Toggle label="Grayscale" checked={gray} onChange={setGray} />
       </div>
 
-      <ScoreCard />
+      {config.scored && <ScoreCard />}
 
       {renderedPx !== null && (
         <div className={`pv-legibility${renderedPx < LEGIBLE_PX ? ' warn' : ''}`}>
@@ -93,7 +100,8 @@ export default function PreviewDialog() {
                 <div className="pv-slot-head">
                   <span className="pv-slot-label">{surface.label}</span>
                   <span className="pv-slot-size">
-                    {surface.width} px · {Math.round((surface.width / project.width) * 100)}%
+                    {surface.width} px ·{' '}
+                    {Math.round(((surface.width * surfaceScale(surface, project.format)) / project.width) * 100)}%
                   </span>
                 </div>
                 {surface.note && <p className="pv-slot-note">{surface.note}</p>}
@@ -105,9 +113,19 @@ export default function PreviewDialog() {
       </div>
 
       <p className="muted pv-footnote">
-        Sizes are what YouTube gives a thumbnail on a 1440 px desktop window and a 390 px phone. Grayscale is the
-        squint test: if the design falls apart without colour, it is leaning on colour alone to separate the subject
-        from the background. The interface drawn around your artwork is simulated — it is never exported.
+        {isBanner ? (
+          <>
+            Each device keeps a centred band of the one {project.width} × {project.height} upload and throws the rest
+            away — these are those bands, at about the width each device gives the channel header.
+          </>
+        ) : (
+          <>
+            Sizes are what YouTube gives a thumbnail on a 1440 px desktop window and a 390 px phone. Grayscale is the
+            squint test: if the design falls apart without colour, it is leaning on colour alone to separate the
+            subject from the background.
+          </>
+        )}{' '}
+        The interface drawn around your artwork is simulated — it is never exported.
       </p>
     </Modal>
   )
@@ -119,7 +137,7 @@ interface SurfaceProps {
   title: string
   theme: Theme
   neighbours: boolean
-  project: { width: number; height: number; format: string }
+  project: { width: number; height: number; format: CanvasFormat }
 }
 
 function Surface({ surface, url, title, neighbours, project }: SurfaceProps) {
@@ -201,7 +219,57 @@ function Surface({ surface, url, title, neighbours, project }: SurfaceProps) {
 
     case 'phone':
       return <PhoneFeed url={url} title={title} width={surface.width} ratio={ratio} neighbours={neighbours} />
+
+    case 'banner':
+      return <ChannelHeader url={url} title={title} surface={surface} project={project} />
   }
+}
+
+/**
+ * How much wider than the surface the whole canvas is drawn. A banner surface
+ * is one device's crop, so the canvas is scaled to make that crop fit.
+ */
+function surfaceScale(surface: PreviewSurface, format: SurfaceProps['project']['format']): number {
+  const guide = formatConfig(format).guides?.find((g) => g.id === surface.guide)
+  return guide ? formatConfig(format).width / guide.width : 1
+}
+
+/** One device's band of the banner, with the channel row beneath it. */
+function ChannelHeader({
+  url,
+  title,
+  surface,
+  project,
+}: {
+  url: string
+  title: string
+  surface: PreviewSurface
+  project: SurfaceProps['project']
+}) {
+  const guide = formatConfig(project.format).guides?.find((g) => g.id === surface.guide)
+  if (!guide) return null
+  const band = guideRect(guide, project.width, project.height)
+  const k = surface.width / guide.width
+  return (
+    <div className="pv-channel" style={{ width: surface.width }}>
+      <div className="pv-banner" style={{ width: surface.width, height: band.height * k }}>
+        {url ? (
+          <img
+            src={url}
+            alt=""
+            style={{ width: project.width * k, height: project.height * k, left: -band.x * k, top: -band.y * k }}
+          />
+        ) : null}
+      </div>
+      <div className="pv-card-meta">
+        <span className="pv-avatar large" />
+        <div>
+          <span className="pv-line-title large">{title || 'Your Channel'}</span>
+          <span className="pv-line-sub">@yourchannel · 123K subscribers · 214 videos</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /**

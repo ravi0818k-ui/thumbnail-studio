@@ -7,10 +7,21 @@
 export type ObjectType = 'image' | 'text' | 'shape'
 
 /**
- * One editor engine, two products (spec §39): the format only changes canvas
+ * One editor engine, three products (spec §39): the format only changes canvas
  * size, safe zones, templates, presets and composition rules.
  */
-export type CanvasFormat = 'thumbnail' | 'shorts'
+export type CanvasFormat = 'thumbnail' | 'shorts' | 'banner'
+
+/**
+ * The devices a channel banner is cropped for. Each one sees a centred band of
+ * the same 2560 × 1440 upload, so a banner is designed against all of them.
+ */
+export type DeviceGuideId = 'tv' | 'desktop' | 'tablet' | 'mobile'
+
+/** Which device guides are drawn over the canvas — remembered per project. */
+export type GuideVisibility = Record<DeviceGuideId, boolean>
+
+export const DEFAULT_GUIDE_VISIBILITY: GuideVisibility = { tv: true, desktop: true, tablet: true, mobile: true }
 
 /**
  * Insets, in percent of the canvas, describing where the host UI may cover the
@@ -266,7 +277,8 @@ export type GradientDirection = 'to-right' | 'to-bottom-right' | 'to-bottom' | '
 export type PatternKind = 'grid' | 'dots' | 'diagonal' | 'rays' | 'noise'
 
 export interface Background {
-  kind: 'solid' | 'gradient' | 'image' | 'pattern'
+  /** `none` leaves the canvas transparent — a banner starts blank. */
+  kind: 'none' | 'solid' | 'gradient' | 'image' | 'pattern'
   color: string
   gradient: { from: string; to: string; direction: GradientDirection }
   assetId: string | null
@@ -294,6 +306,8 @@ export interface Project {
   width: number
   height: number
   safeZone: SafeZone
+  /** Device guides shown over a banner. Editor-only; never exported. */
+  guides: GuideVisibility
   background: Background
   objects: SceneObject[]
   createdAt: number

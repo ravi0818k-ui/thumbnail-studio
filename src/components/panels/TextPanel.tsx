@@ -3,6 +3,7 @@ import { createText } from '../../engine/factory'
 import { TEXT_PRESETS } from '../../data/textPresets'
 import { measuredTextHeight } from '../../engine/text'
 import { ensureFontLoaded } from '../../data/fonts'
+import { guideRect, innermostGuide } from '../../data/formats'
 import type { TextObject } from '../../types'
 
 export default function TextPanel() {
@@ -12,10 +13,16 @@ export default function TextPanel() {
   const updateSelected = useEditor((s) => s.updateSelected)
 
   const add = async (partial: Partial<TextObject>) => {
-    const width = Math.round(project.width * 0.55)
-    const obj = createText({ ...partial, width, x: Math.round(project.width * 0.08), y: Math.round(project.height * 0.2) })
+    // On a banner, new text lands centred in the band every device shows —
+    // the thumbnail's upper-left spot is TV-only there.
+    const guide = innermostGuide(project.format)
+    const band = guide ? guideRect(guide, project.width, project.height) : null
+    const width = Math.round(band ? band.width * 0.8 : project.width * 0.55)
+    const x = Math.round(band ? band.x + (band.width - width) / 2 : project.width * 0.08)
+    const obj = createText({ ...partial, width, x, y: Math.round(project.height * 0.2) })
     await ensureFontLoaded(obj.fontFamily, obj.fontWeight, obj.fontSize)
     obj.height = measuredTextHeight(obj)
+    if (band) obj.y = Math.round(band.y + (band.height - obj.height) / 2)
     addObject(obj)
     useEditor.getState().setEditingText(obj.id)
   }

@@ -119,9 +119,7 @@ export default function ExportDialog() {
           </label>
           {settings.format === 'jpg' && <p className="muted">JPG has no transparency — use PNG or WEBP.</p>}
           <p className="muted" style={{ marginTop: 14 }}>
-            {project.format === 'shorts'
-              ? 'YouTube accepts files up to 2 MB. 1080 × 1920 PNG at 1× is the safe default for a Shorts cover.'
-              : 'YouTube accepts files up to 2 MB. 1280 × 720 PNG at 1× is the safe default.'}
+            {formatConfig(project.format).exportNote}
           </p>
         </div>
       </div>

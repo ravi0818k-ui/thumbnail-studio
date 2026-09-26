@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useEditor } from '../store/editorStore'
-import type { ImageObject, SceneObject, TextObject } from '../types'
+import type { ImageObject, Project, SceneObject, TextObject } from '../types'
 import { renderProject } from '../engine/renderer'
 import {
   boundingRect,
@@ -30,7 +30,8 @@ import { runFocus } from '../engine/runFocus'
 import type { FocusSelection } from '../engine/objectMask'
 import { updateAssetFromCanvas } from '../engine/assets'
 import ContextMenu, { type ContextMenuState } from './ContextMenu'
-import { safeZoneRects } from '../data/formats'
+import { formatConfig, guideRect, safeZoneRects, visibleGuides } from '../data/formats'
+import { croppedOn } from '../engine/designAssistant'
 
 type Drag =
   | { kind: 'none' }
@@ -210,6 +211,77 @@ export default function CanvasStage() {
   }
 
   /**
+   * A banner's device bands, outermost first. Each ring between one guide and
+   * the next one in is tinted in that guide's colour, so the bands nest
+   * instead of stacking tints, and every border is drawn over a dark line so
+   * it survives both a white and a black banner. Editor-only, like the rest of
+   * the overlay.
+   */
+  const drawDeviceGuides = (ctx: CanvasRenderingContext2D, px: number) => {
+    const { width, height } = project
+    const guides = visibleGuides(project)
+    if (guides.length === 0) return
+    const rects = guides.map((g) => guideRect(g, width, height))
+
+    ctx.save()
+    guides.forEach((guide, i) => {
+      const r = rects[i]
+      const inner = rects[i + 1]
+      const ring = new Path2D()
+      ring.rect(r.x, r.y, r.width, r.height)
+      if (inner) ring.rect(inner.x, inner.y, inner.width, inner.height)
+      ctx.globalAlpha = 0.09
+      ctx.fillStyle = guide.color
+      ctx.fill(ring, 'evenodd')
+    })
+    ctx.globalAlpha = 1
+
+    // TV is the whole canvas, so its border is solid; the crops are dashed.
+    guides.forEach((guide, i) => {
+      const r = rects[i]
+      const inset = px
+      const dash = guide.id === 'tv' ? [] : [12 * px, 7 * px]
+      ctx.setLineDash(dash)
+      ctx.lineWidth = 4 * px
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+      ctx.strokeRect(r.x + inset, r.y + inset, r.width - inset * 2, r.height - inset * 2)
+      ctx.lineWidth = 2 * px
+      ctx.strokeStyle = guide.color
+      ctx.strokeRect(r.x + inset, r.y + inset, r.width - inset * 2, r.height - inset * 2)
+    })
+    ctx.setLineDash([])
+
+    // Labels are a constant size on screen and sit on a dark plate, so they
+    // read at any zoom and over any artwork.
+    const font = 12 * px
+    const pad = 6 * px
+    const margin = 8 * px
+    ctx.font = `700 ${font}px Inter, system-ui, sans-serif`
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'left'
+    guides.forEach((guide, i) => {
+      const r = rects[i]
+      const text = `${guide.label} ${guide.width} × ${guide.height}`
+      const w = ctx.measureText(text).width + pad * 2
+      const h = font + pad * 1.4
+      const x = r.x + margin
+      const y =
+        guide.labelAt === 'above'
+          ? r.y - margin - h
+          : guide.labelAt === 'inside-bottom'
+            ? r.y + r.height - margin - h
+            : r.y + margin
+      ctx.fillStyle = 'rgba(10,12,16,0.85)'
+      ctx.beginPath()
+      ctx.roundRect(x, y, w, h, 4 * px)
+      ctx.fill()
+      ctx.fillStyle = guide.color
+      ctx.fillText(text, x + pad, y + h / 2)
+    })
+    ctx.restore()
+  }
+
+  /**
    * Crop mode: the discarded part of the photo is shown ghosted outside the
    * crop box, so you can see what you are cutting away and pan it back.
    */
@@ -304,7 +376,10 @@ export default function CanvasStage() {
     const px = 1 / zoom
 
     drawGrid(ctx, px)
-    if (showSafeZone) drawSafeZone(ctx, px)
+    // A banner is cropped per device rather than covered, so its guides replace
+    // the inset safe zone; they sit above the art and below the handles.
+    if (formatConfig(project.format).guides) drawDeviceGuides(ctx, px)
+    else if (showSafeZone) drawSafeZone(ctx, px)
 
     if (cropping) {
       drawCropOverlay(ctx, cropping, px)
@@ -901,6 +976,7 @@ export default function CanvasStage() {
   }, [])
 
   const editing = editingTextId ? (project.objects.find((o) => o.id === editingTextId) as TextObject | undefined) : undefined
+  const cropWarning = cropWarningFor(project, selection)
 
   return (
     <div className="stage" ref={stageRef} style={{ overflow: 'auto', padding: 28 }}>
@@ -918,10 +994,31 @@ export default function CanvasStage() {
       >
         <canvas ref={canvasRef} />
         {editing && <TextEditorOverlay object={editing} zoom={zoom} />}
+        {cropWarning && (
+          <div className="crop-warning" role="status">
+            {cropWarning}
+          </div>
+        )}
       </div>
       {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
     </div>
   )
+}
+
+/**
+ * "This element may be cropped on mobile", for whatever is selected. Only the
+ * devices that cut into it are named, outermost first, since cropped on
+ * tablet implies cropped on mobile too.
+ */
+function cropWarningFor(project: Project, selection: string[]): string | null {
+  const selected = project.objects.filter((o) => selection.includes(o.id))
+  const hits = selected.map((o) => ({ obj: o, devices: croppedOn(project, o) })).filter((h) => h.devices.length > 0)
+  if (hits.length === 0) return null
+  const widest = hits.reduce((a, b) => (b.devices.length > a.devices.length ? b : a))
+  const devices = widest.devices.map((g) => g.label.toLowerCase())
+  const where = devices.length === 1 ? devices[0] : `${devices.slice(0, -1).join(', ')} and ${devices[devices.length - 1]}`
+  const what = hits.length === 1 ? `“${hits[0].obj.name}”` : `${hits.length} selected layers`
+  return `${what} may be cropped on ${where}.`
 }
 
 function anchorFor(obj: SceneObject, handle: HandleId): Point {
@@ -936,7 +1033,7 @@ function computeSnap(
   originals: Map<string, { x: number; y: number }>,
   dx: number,
   dy: number,
-  project: { width: number; height: number; objects: SceneObject[] },
+  project: Project,
   zoom: number,
 ): { dx: number; dy: number; guides: Guide[] } {
   const threshold = SNAP_THRESHOLD / zoom
@@ -949,6 +1046,12 @@ function computeSnap(
 
   const targetsV = [0, project.width / 2, project.width]
   const targetsH = [0, project.height / 2, project.height]
+  // A banner's device bands are the lines its content is placed against.
+  for (const guide of visibleGuides(project)) {
+    const r = guideRect(guide, project.width, project.height)
+    targetsV.push(r.x, r.x + r.width)
+    targetsH.push(r.y, r.y + r.height)
+  }
   for (const other of project.objects) {
     if (movingIds.has(other.id) || other.hidden) continue
     const b = boundingRect([other])!

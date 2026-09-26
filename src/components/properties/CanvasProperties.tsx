@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useEditor, type GridMode } from '../../store/editorStore'
 import { Field, NumberInput, Section, Segmented, Slider, Toggle } from '../ui'
-import { FORMAT_LIST, formatConfig } from '../../data/formats'
+import { FORMAT_LIST, formatConfig, visibleGuides } from '../../data/formats'
 import { analyzeDesign, type CheckStatus } from '../../engine/designAssistant'
 import type { CanvasFormat } from '../../types'
 
@@ -51,28 +51,21 @@ export default function CanvasProperties() {
             {preset.recommended && <span className="badge">recommended</span>}
           </button>
         ))}
-        <div className="grid-2" style={{ marginTop: 8 }}>
-          <Field label="W">
-            <NumberInput value={custom.width} min={64} max={4096} onChange={(width) => setCustom((c) => ({ ...c, width }))} />
-          </Field>
-          <Field label="H">
-            <NumberInput
-              value={custom.height}
-              min={64}
-              max={4096}
-              onChange={(height) => setCustom((c) => ({ ...c, height }))}
-            />
-          </Field>
-        </div>
-        <button
-          className="btn small block"
-          onClick={() => setCanvasSize(Math.round(custom.width), Math.round(custom.height))}
-        >
-          Apply custom size
-        </button>
+        {config.resizable ? (
+          <CustomSize
+            width={custom.width}
+            height={custom.height}
+            onChange={setCustom}
+            onApply={() => setCanvasSize(Math.round(custom.width), Math.round(custom.height))}
+          />
+        ) : (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Fixed size — YouTube crops this one upload for every device.
+          </p>
+        )}
       </Section>
 
-      <SafeZoneSection />
+      {config.guides ? <DeviceGuidesSection /> : <SafeZoneSection />}
 
       <Section title="Background">
         <button className="btn block" onClick={() => setPanel('background')}>
@@ -93,7 +86,7 @@ export default function CanvasProperties() {
             ]}
           />
         </Field>
-        <Toggle label="Safe zone overlay" checked={showSafeZone} onChange={toggleSafeZone} />
+        {!config.guides && <Toggle label="Safe zone overlay" checked={showSafeZone} onChange={toggleSafeZone} />}
         <Toggle label="Smart guides" checked={showGuides} onChange={toggleGuides} />
         <Toggle label="Snap to guides and objects" checked={snapping} onChange={toggleSnapping} />
         <p className="muted" style={{ marginTop: 8 }}>
@@ -103,6 +96,68 @@ export default function CanvasProperties() {
 
       <AssistantSection />
     </>
+  )
+}
+
+function CustomSize({
+  width,
+  height,
+  onChange,
+  onApply,
+}: {
+  width: number
+  height: number
+  onChange: (size: { width: number; height: number }) => void
+  onApply: () => void
+}) {
+  return (
+    <>
+      <div className="grid-2" style={{ marginTop: 8 }}>
+        <Field label="W">
+          <NumberInput value={width} min={64} max={4096} onChange={(w) => onChange({ width: w, height })} />
+        </Field>
+        <Field label="H">
+          <NumberInput value={height} min={64} max={4096} onChange={(h) => onChange({ width, height: h })} />
+        </Field>
+      </div>
+      <button className="btn small block" onClick={onApply}>
+        Apply custom size
+      </button>
+    </>
+  )
+}
+
+/**
+ * One checkbox per device. They are independent, and the bands nest (mobile
+ * inside tablet inside desktop), so any combination reads on the canvas.
+ */
+function DeviceGuidesSection() {
+  const project = useEditor((s) => s.project)
+  const toggleDeviceGuide = useEditor((s) => s.toggleDeviceGuide)
+  const config = formatConfig(project.format)
+  const visible = new Set(visibleGuides(project).map((g) => g.id))
+
+  return (
+    <Section title="Safe zones">
+      <p className="muted" style={{ margin: '0 0 10px' }}>
+        {config.safeZoneHint}
+      </p>
+      {(config.guides ?? []).map((guide) => (
+        <label key={guide.id} className="toggle guide-toggle">
+          <input type="checkbox" checked={visible.has(guide.id)} onChange={() => toggleDeviceGuide(guide.id)} />
+          <i style={{ borderColor: guide.color, background: `${guide.color}33` }} />
+          <span>
+            {guide.label}
+            <em>
+              {guide.width} × {guide.height}
+            </em>
+          </span>
+        </label>
+      ))}
+      <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+        Guides only — they are never exported.
+      </p>
+    </Section>
   )
 }
 

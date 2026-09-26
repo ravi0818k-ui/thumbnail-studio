@@ -1,4 +1,4 @@
-import type { CanvasFormat } from '../types'
+import type { CanvasFormat, DeviceGuideId } from '../types'
 
 // ---------------------------------------------------------------------------
 // Where a thumbnail is actually seen. Every entry is one real YouTube surface
@@ -27,6 +27,8 @@ export type SurfaceLayout =
   | 'phone'
   /** Living-room scale: large thumbnail, large title beneath. */
   | 'tv'
+  /** A channel header: only the band one device keeps of a banner. */
+  | 'banner'
 
 export interface PreviewSurface {
   id: string
@@ -37,6 +39,8 @@ export interface PreviewSurface {
   layout: SurfaceLayout
   /** Shown under the label when the surface has a catch worth knowing. */
   note?: string
+  /** For a banner: the device guide whose crop this surface shows. `width` is then the width of that crop. */
+  guide?: DeviceGuideId
 }
 
 const THUMBNAIL_SURFACES: PreviewSurface[] = [
@@ -105,8 +109,47 @@ const SHORTS_SURFACES: PreviewSurface[] = [
   },
 ]
 
+// A banner is never shrunk into a card; it is cropped. Each surface shows one
+// device's band at roughly the width that device gives the channel header.
+const BANNER_SURFACES: PreviewSurface[] = [
+  {
+    id: 'banner-desktop',
+    group: 'Desktop',
+    label: 'Channel header · desktop',
+    width: 960,
+    layout: 'banner',
+    guide: 'desktop',
+    note: 'A wide, short strip — the top and bottom two thirds of the upload are gone.',
+  },
+  { id: 'banner-tablet', group: 'Tablet', label: 'Channel header · tablet', width: 720, layout: 'banner', guide: 'tablet' },
+  {
+    id: 'banner-mobile',
+    group: 'Mobile',
+    label: 'Channel header · phone app',
+    width: 360,
+    layout: 'banner',
+    guide: 'mobile',
+    note: 'The band every device shows. If the name or logo is not here, someone does not see it.',
+  },
+  {
+    id: 'banner-tv',
+    group: 'TV',
+    label: 'Channel page on a TV',
+    width: 640,
+    layout: 'banner',
+    guide: 'tv',
+    note: 'The only place the whole upload is seen.',
+  },
+]
+
+const SURFACES: Record<CanvasFormat, PreviewSurface[]> = {
+  thumbnail: THUMBNAIL_SURFACES,
+  shorts: SHORTS_SURFACES,
+  banner: BANNER_SURFACES,
+}
+
 export function surfacesFor(format: CanvasFormat): PreviewSurface[] {
-  return format === 'shorts' ? SHORTS_SURFACES : THUMBNAIL_SURFACES
+  return SURFACES[format] ?? THUMBNAIL_SURFACES
 }
 
 /** Groups in the order they should be shown, with their surfaces. */

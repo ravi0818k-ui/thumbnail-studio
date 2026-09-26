@@ -1,5 +1,5 @@
 import type { Project, SceneObject, TextObject } from '../types'
-import { safeZoneRects } from '../data/formats'
+import { formatConfig, guideRect, innermostGuide, safeZoneRects, type DeviceGuide, type Rect } from '../data/formats'
 import { boundingRect } from './geometry'
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,31 @@ const isText = (o: SceneObject): o is TextObject => o.type === 'text'
  * thumbnail shown in a 168 px grid cell.
  */
 function minHeadlineRatio(project: Project): number {
-  return project.format === 'shorts' ? 0.045 : 0.1
+  // A banner's mobile band is shown about 390 px wide, a quarter of its 1546,
+  // so 5% of the canvas lands near 18 px on a phone.
+  return project.format === 'shorts' ? 0.045 : project.format === 'banner' ? 0.05 : 0.1
+}
+
+const contains = (outer: Rect, inner: Rect) =>
+  inner.x >= outer.x - 0.5 &&
+  inner.y >= outer.y - 0.5 &&
+  inner.x + inner.width <= outer.x + outer.width + 0.5 &&
+  inner.y + inner.height <= outer.y + outer.height + 0.5
+
+/**
+ * The devices whose crop cuts into this layer, outermost first. Only text and
+ * images count — that is where a channel name or a logo lives — and a layer
+ * that covers the whole mobile band is backdrop art, meant to be cropped.
+ * Empty for a format without device guides.
+ */
+export function croppedOn(project: Project, obj: SceneObject): DeviceGuide[] {
+  const guides = formatConfig(project.format).guides
+  const innermost = innermostGuide(project.format)
+  if (!guides || !innermost || obj.hidden || obj.type === 'shape') return []
+  if (obj.type === 'image' && !obj.assetId) return []
+  const bounds = boundingRect([obj])!
+  if (contains(bounds, guideRect(innermost, project.width, project.height))) return []
+  return guides.filter((g) => !contains(guideRect(g, project.width, project.height), bounds))
 }
 
 export function analyzeDesign(project: Project): DesignReport {
@@ -57,32 +81,49 @@ export function analyzeDesign(project: Project): DesignReport {
   }
 
   // Inside the safe area ----------------------------------------------------
-  const outside = visible.filter((o) => {
-    if (o.type === 'image' && !o.assetId) return false
-    const b = boundingRect([o])!
-    return b.x < warning.x || b.y < warning.y || b.x + b.width > warning.x + warning.width || b.y + b.height > warning.y + warning.height
-  })
-  // Full-bleed photos and backdrops are meant to run to the edge.
-  const offenders = outside.filter((o) => !isFullBleed(o, project))
-  checks.push({
-    id: 'safe-area',
-    label: 'Content is inside the safe area',
-    status: offenders.length === 0 ? 'pass' : offenders.some(isText) ? 'fail' : 'warn',
-    detail:
-      offenders.length === 0
-        ? 'Nothing important sits under the interface.'
-        : `Reaches into the covered area: ${offenders.map((o) => o.name).join(', ')}.`,
-  })
+  const innermost = innermostGuide(project.format)
+  if (innermost) {
+    // A banner is cropped rather than covered, so the check is the band every
+    // device shows, and there is no bottom row to crowd.
+    const device = innermost.label.toLowerCase()
+    const cropped = visible.filter((o) => croppedOn(project, o).some((g) => g.id === innermost.id))
+    checks.push({
+      id: 'safe-area',
+      label: `Content is inside the ${device} band`,
+      status: cropped.length === 0 ? 'pass' : cropped.some(isText) ? 'fail' : 'warn',
+      detail:
+        cropped.length === 0
+          ? `Every name, logo and line of text is visible on ${device}.`
+          : `May be cropped on ${device}: ${cropped.map((o) => o.name).join(', ')}.`,
+    })
+  } else {
+    const outside = visible.filter((o) => {
+      if (o.type === 'image' && !o.assetId) return false
+      const b = boundingRect([o])!
+      return b.x < warning.x || b.y < warning.y || b.x + b.width > warning.x + warning.width || b.y + b.height > warning.y + warning.height
+    })
+    // Full-bleed photos and backdrops are meant to run to the edge.
+    const offenders = outside.filter((o) => !isFullBleed(o, project))
+    checks.push({
+      id: 'safe-area',
+      label: 'Content is inside the safe area',
+      status: offenders.length === 0 ? 'pass' : offenders.some(isText) ? 'fail' : 'warn',
+      detail:
+        offenders.length === 0
+          ? 'Nothing important sits under the interface.'
+          : `Reaches into the covered area: ${offenders.map((o) => o.name).join(', ')}.`,
+    })
 
-  // Bottom crowding ---------------------------------------------------------
-  const bottomLimit = safe.y + safe.height
-  const low = texts.filter((t) => t.y + t.height > bottomLimit)
-  checks.push({
-    id: 'bottom',
-    label: 'Text is clear of the bottom row',
-    status: low.length === 0 ? 'pass' : 'warn',
-    detail: low.length === 0 ? 'Bottom of the frame is clear.' : `Too close to the bottom: ${low.map((t) => t.name).join(', ')}.`,
-  })
+    // Bottom crowding -------------------------------------------------------
+    const bottomLimit = safe.y + safe.height
+    const low = texts.filter((t) => t.y + t.height > bottomLimit)
+    checks.push({
+      id: 'bottom',
+      label: 'Text is clear of the bottom row',
+      status: low.length === 0 ? 'pass' : 'warn',
+      detail: low.length === 0 ? 'Bottom of the frame is clear.' : `Too close to the bottom: ${low.map((t) => t.name).join(', ')}.`,
+    })
+  }
 
   // Clutter -----------------------------------------------------------------
   const wordCount = texts.reduce((sum, t) => sum + t.text.trim().split(/\s+/).filter(Boolean).length, 0)

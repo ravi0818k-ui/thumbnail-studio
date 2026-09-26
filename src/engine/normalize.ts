@@ -1,5 +1,6 @@
 import {
   DEFAULT_FADE,
+  DEFAULT_GUIDE_VISIBILITY,
   DEFAULT_MASK,
   type ImageObject,
   type Project,
@@ -21,6 +22,8 @@ export function normalizeProject(raw: Project): Project {
     // Older projects predate brand presets; null means "no brand chosen yet".
     brandId: raw.brandId ?? null,
     safeZone: { ...defaultSafeZone(format), ...(raw.safeZone ?? {}) },
+    // Device guides arrived with banners; every one starts switched on.
+    guides: { ...DEFAULT_GUIDE_VISIBILITY, ...(raw.guides ?? {}) },
     objects: (raw.objects ?? []).map(normalizeObject),
   }
 }

@@ -5,6 +5,9 @@ import TemplatePreview from './TemplatePreview'
 import { FORMAT_LIST } from '../data/formats'
 import type { CanvasFormat } from '../types'
 
+/** Only formats that have layouts get a tab; a banner starts from a blank canvas. */
+const GALLERY_FORMATS = FORMAT_LIST.filter((f) => templatesForFormat(f.id).length > 0)
+
 export default function TemplateScreen() {
   const applyTemplate = useEditor((s) => s.applyTemplate)
   const newProject = useEditor((s) => s.newProject)
@@ -56,7 +59,7 @@ export default function TemplateScreen() {
               onChange={(e) => setQuery(e.target.value)}
             />
             <div className="seg" style={{ maxWidth: 280 }}>
-              {FORMAT_LIST.map((f) => (
+              {GALLERY_FORMATS.map((f) => (
                 <button
                   key={f.id}
                   className={format === f.id ? 'active' : ''}
