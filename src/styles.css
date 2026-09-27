@@ -3810,3 +3810,38 @@ button.fp-chip:hover {
   border-radius: 8px;
   background: linear-gradient(135deg, #00b140 50%, #0047ab 50%);
 }
+
+.mobile-notice {
+  text-align: center;
+}
+
+.mobile-notice p {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.mobile-notice p b {
+  color: var(--text);
+}
+
+.mobile-notice-icon {
+  font-size: 44px;
+  margin-bottom: 12px;
+}
+
+.mobile-notice-icon.rotate {
+  animation: mobile-notice-rotate 2.4s ease-in-out infinite;
+}
+
+@keyframes mobile-notice-rotate {
+  0%, 25% { transform: rotate(0deg); }
+  50%, 75% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-notice-icon.rotate {
+    animation: none;
+  }
+}

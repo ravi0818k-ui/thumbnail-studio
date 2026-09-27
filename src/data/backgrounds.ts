@@ -36,6 +36,10 @@ function pattern(
   }
 }
 
+function solid(id: string, label: string, color: string): BackgroundPreset {
+  return { id, label, value: { ...DEFAULT_BACKGROUND, kind: 'solid', color } }
+}
+
 export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   gradient('dark', 'Dark Gradient', '#2b3240', '#07090d'),
   gradient('blue-glow', 'Blue Glow', '#1d4ed8', '#050914', 'radial'),
@@ -49,16 +53,17 @@ export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   pattern('minimal-dots', 'Minimal Dots', 'dots', '#cbd5e1', '#f8fafc', 28),
   pattern('gaming-rays', 'Gaming Rays', 'rays', '#a21caf', '#12031a', 24),
   pattern('abstract', 'Abstract Stripes', 'diagonal', '#1f2937', '#0b1120', 36),
-  {
-    id: 'solid-black',
-    label: 'Solid Black',
-    value: { ...DEFAULT_BACKGROUND, kind: 'solid', color: '#000000' },
-  },
-  {
-    id: 'solid-white',
-    label: 'Solid White',
-    value: { ...DEFAULT_BACKGROUND, kind: 'solid', color: '#ffffff' },
-  },
+  solid('solid-black', 'Solid Black', '#000000'),
+  solid('solid-white', 'Solid White', '#ffffff'),
+  // Flat grounds picked off YouTube thumbnails.
+  solid('solid-deep-teal', 'Deep Teal', '#0D524E'),
+  solid('solid-pine', 'Pine Green', '#035047'),
+  solid('solid-indigo', 'Indigo', '#262187'),
+  solid('solid-royal-indigo', 'Royal Indigo', '#29228A'),
+  solid('solid-violet', 'Deep Violet', '#34278D'),
+  solid('solid-wine', 'Wine', '#7D1B32'),
+  solid('solid-crimson', 'Crimson', '#D0121E'),
+  solid('solid-amber', 'Amber', '#F8A646'),
 ]
 
 export const SWATCHES = [
