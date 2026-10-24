@@ -10,8 +10,9 @@ import type {
   SceneObject,
   ShapeObject,
   TextObject,
+  WatchedBar,
 } from '../types'
-import { DEFAULT_BACKGROUND, DEFAULT_GUIDE_VISIBILITY } from '../types'
+import { DEFAULT_BACKGROUND, DEFAULT_GUIDE_VISIBILITY, DEFAULT_WATCHED_BAR } from '../types'
 import { defaultSafeZone, formatConfig, formatForSize } from '../data/formats'
 import { DEFAULT_BRAND_ID } from '../data/brands'
 import { normalizeProject } from '../engine/normalize'
@@ -126,6 +127,8 @@ export interface EditorState {
 
   // background ------------------------------------------------------------
   setBackground: (patch: Partial<Background>) => void
+  /** Part of the artwork, so callers push history first, like setBackground. */
+  setWatchedBar: (patch: Partial<WatchedBar>) => void
 
   // history ---------------------------------------------------------------
   pushHistory: (tag?: string) => void
@@ -188,6 +191,7 @@ function emptyProject(options: NewProjectOptions = {}): Project {
     height: options.height ?? config.height,
     safeZone: defaultSafeZone(format),
     guides: { ...DEFAULT_GUIDE_VISIBILITY },
+    watchedBar: { ...DEFAULT_WATCHED_BAR },
     background: { ...JSON.parse(JSON.stringify(DEFAULT_BACKGROUND)), kind: config.background },
     objects: [],
     createdAt: Date.now(),
@@ -613,6 +617,12 @@ export const useEditor = create<EditorState>((set, get) => {
     setBackground: (patch) => {
       mutate((p) => {
         p.background = { ...p.background, ...patch }
+      })
+    },
+
+    setWatchedBar: (patch) => {
+      mutate((p) => {
+        p.watchedBar = { ...p.watchedBar, ...patch }
       })
     },
 

@@ -1,4 +1,4 @@
-import type { Background, CanvasFormat, DeviceGuideId, Project, SafeZone } from '../types'
+import type { Background, CanvasFormat, DeviceGuideId, Project, SafeZone, WatchedBar } from '../types'
 import type { PanelId } from '../store/editorStore'
 
 // ---------------------------------------------------------------------------
@@ -64,6 +64,12 @@ export interface FormatConfig {
    * design survives a feed card; a banner is never shown as one.
    */
   scored: boolean
+  /**
+   * Whether a painted watched bar is offered. YouTube only draws a resume bar
+   * on horizontal video cards, so on a Shorts cover or a banner it would read
+   * as a mistake rather than as a half-watched video.
+   */
+  watchedBar: boolean
   /** Device crop guides, outermost first. Replaces the inset safe zone. */
   guides?: DeviceGuide[]
 }
@@ -109,6 +115,7 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     background: 'solid',
     resizable: true,
     scored: true,
+    watchedBar: true,
   },
   shorts: {
     id: 'shorts',
@@ -133,6 +140,7 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     background: 'solid',
     resizable: true,
     scored: true,
+    watchedBar: false,
   },
   banner: {
     id: 'banner',
@@ -153,6 +161,7 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     background: 'none',
     resizable: false,
     scored: false,
+    watchedBar: false,
     guides: BANNER_GUIDES,
   },
 }
@@ -209,4 +218,33 @@ export function innermostGuide(format: CanvasFormat): DeviceGuide | null {
 /** Guides switched on for this project. Older projects predate the field, so a missing entry reads as on. */
 export function visibleGuides(project: Pick<Project, 'format' | 'guides'>): DeviceGuide[] {
   return (formatConfig(project.format).guides ?? []).filter((g) => project.guides?.[g.id] ?? true)
+}
+
+/** YouTube's resume bar is about 4 px tall on a 360 px card: 1/90 of the width. */
+export const WATCHED_BAR_HEIGHT = 1 / 90
+
+export const WATCHED_SHARE_RANGE = { min: 5, max: 95 }
+
+export interface WatchedBarRects {
+  track: { x: number; y: number; width: number; height: number }
+  played: { x: number; y: number; width: number; height: number }
+}
+
+/**
+ * Where the painted watched bar sits, in canvas pixels, or null when it is
+ * off or the format does not take one. The share is clamped so a bar is
+ * always visibly part-way: 0% would be invisible and 100% reads as finished.
+ */
+export function watchedBarRects(
+  project: Pick<Project, 'format' | 'width' | 'height'> & { watchedBar?: WatchedBar },
+): WatchedBarRects | null {
+  const bar = project.watchedBar
+  if (!bar?.on || !formatConfig(project.format).watchedBar) return null
+  const height = Math.max(2, Math.round(project.width * WATCHED_BAR_HEIGHT))
+  const share = Math.min(WATCHED_SHARE_RANGE.max, Math.max(WATCHED_SHARE_RANGE.min, bar.share)) / 100
+  const y = project.height - height
+  return {
+    track: { x: 0, y, width: project.width, height },
+    played: { x: 0, y, width: project.width * share, height },
+  }
 }

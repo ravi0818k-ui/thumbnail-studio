@@ -297,6 +297,19 @@ export const DEFAULT_BACKGROUND: Background = {
   pattern: { kind: 'grid', color: '#2a3340', background: '#0e1218', scale: 40 },
 }
 
+/**
+ * A YouTube-style resume bar painted into the design itself, so the upload
+ * looks part-watched. Unlike the safe zone and device guides this is artwork:
+ * it is drawn by renderProject and ends up in every export.
+ */
+export interface WatchedBar {
+  on: boolean
+  /** How far along the red part reaches, in percent of the width. */
+  share: number
+}
+
+export const DEFAULT_WATCHED_BAR: WatchedBar = { on: false, share: 35 }
+
 export interface Project {
   id: string
   name: string
@@ -308,6 +321,8 @@ export interface Project {
   safeZone: SafeZone
   /** Device guides shown over a banner. Editor-only; never exported. */
   guides: GuideVisibility
+  /** Painted into the export; only drawn for formats that allow it. */
+  watchedBar: WatchedBar
   background: Background
   objects: SceneObject[]
   createdAt: number

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useEditor, type GridMode } from '../../store/editorStore'
 import { Field, NumberInput, Section, Segmented, Slider, Toggle } from '../ui'
-import { FORMAT_LIST, formatConfig, visibleGuides } from '../../data/formats'
+import { FORMAT_LIST, WATCHED_SHARE_RANGE, formatConfig, visibleGuides } from '../../data/formats'
 import { analyzeDesign, type CheckStatus } from '../../engine/designAssistant'
 import type { CanvasFormat } from '../../types'
 
@@ -66,6 +66,8 @@ export default function CanvasProperties() {
       </Section>
 
       {config.guides ? <DeviceGuidesSection /> : <SafeZoneSection />}
+
+      {config.watchedBar && <WatchedBarSection />}
 
       <Section title="Background">
         <button className="btn block" onClick={() => setPanel('background')}>
@@ -217,6 +219,44 @@ function SafeZoneSection() {
       <button className="btn small block" onClick={resetSafeZone}>
         Reset to {formatConfig(project.format).shortLabel} defaults
       </button>
+    </Section>
+  )
+}
+
+/**
+ * The painted resume bar. It is artwork, not an overlay: it goes into the
+ * export, which is why it lives here and not under View.
+ */
+function WatchedBarSection() {
+  const bar = useEditor((s) => s.project.watchedBar)
+  const setWatchedBar = useEditor((s) => s.setWatchedBar)
+  const pushHistory = useEditor((s) => s.pushHistory)
+
+  return (
+    <Section title="Watched bar">
+      <Toggle
+        label="Show watched bar"
+        checked={bar.on}
+        onChange={(on) => {
+          pushHistory()
+          setWatchedBar({ on })
+        }}
+      />
+      {bar.on && (
+        <Slider
+          label="Watched"
+          value={bar.share}
+          min={WATCHED_SHARE_RANGE.min}
+          max={WATCHED_SHARE_RANGE.max}
+          suffix="%"
+          historyTag="watched-share"
+          onChange={(share) => setWatchedBar({ share })}
+        />
+      )}
+      <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>
+        A red bar along the bottom, so the video looks part-watched. It is saved into the exported image. Viewers
+        who really did watch part of the video will see YouTube&apos;s own bar over it.
+      </p>
     </Section>
   )
 }

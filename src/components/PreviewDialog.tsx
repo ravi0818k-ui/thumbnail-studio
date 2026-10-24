@@ -4,7 +4,7 @@ import { Modal, Segmented, Toggle } from './ui'
 import { renderToCanvas } from '../engine/renderer'
 import type { CanvasFormat, TextObject } from '../types'
 import { groupedSurfaces, smallestSurface, surfacesFor, type PreviewSurface } from '../data/previewSurfaces'
-import { formatConfig, guideRect } from '../data/formats'
+import { formatConfig, guideRect, watchedBarRects } from '../data/formats'
 import ScoreCard from './ScoreCard'
 
 type Theme = 'dark' | 'light'
@@ -41,6 +41,8 @@ export default function PreviewDialog() {
 
   const config = formatConfig(project.format)
   const isBanner = !!config.guides
+  // A bar painted into the design already sits where the simulated one would.
+  const painted = !!watchedBarRects(project)
 
   useEffect(() => {
     // 2× the widest surface, so nothing in here is upscaled. A banner surface
@@ -63,7 +65,7 @@ export default function PreviewDialog() {
   const renderedPx =
     smallestText === null ? null : (smallestText * smallest.width * surfaceScale(smallest, project.format)) / project.width
 
-  const shared = { url, title, theme, project, watched }
+  const shared = { url, title, theme, project, watched: watched && !painted }
 
   return (
     <Modal title="Preview" onClose={close} width={1020}>
@@ -83,7 +85,7 @@ export default function PreviewDialog() {
           ]}
         />
         {!isBanner && <Toggle label="Competing videos" checked={neighbours} onChange={setNeighbours} />}
-        {!isBanner && <Toggle label="Partly watched" checked={watched} onChange={setWatched} />}
+        {!isBanner && !painted && <Toggle label="Partly watched" checked={watched} onChange={setWatched} />}
         <Toggle label="Grayscale" checked={gray} onChange={setGray} />
       </div>
 

@@ -52,6 +52,13 @@ together:
 - The guides are drawn in `CanvasStage.drawDeviceGuides`, inside `drawOverlay` — above the art, below
   the handles, never in an export. For a format with guides they replace the inset safe-zone overlay.
 
+**The watched bar is artwork, not chrome.** `Project.watchedBar` paints a YouTube-style red resume bar
+along the bottom so the upload looks part-watched. Unlike the safe zone and guides it *is* drawn by
+`renderProject` (last, above every layer) and so reaches the export. `watchedBarRects()` in `formats.ts`
+is the one place its geometry lives, and it returns null unless the format's `watchedBar` flag is set —
+only the horizontal thumbnail, because YouTube draws no resume bar on Shorts or banners. The Preview
+dialog hides its simulated "Partly watched" bar when one is painted, so the two never stack.
+
 A banner starts on `background.kind === 'none'` (transparent). JPEG cannot store alpha, so
 `exportCanvas` and `projectThumbnail` flatten onto white rather than letting the encoder write black.
 

@@ -2,6 +2,7 @@ import {
   DEFAULT_FADE,
   DEFAULT_GUIDE_VISIBILITY,
   DEFAULT_MASK,
+  DEFAULT_WATCHED_BAR,
   type ImageObject,
   type Project,
   type SceneObject,
@@ -24,6 +25,8 @@ export function normalizeProject(raw: Project): Project {
     safeZone: { ...defaultSafeZone(format), ...(raw.safeZone ?? {}) },
     // Device guides arrived with banners; every one starts switched on.
     guides: { ...DEFAULT_GUIDE_VISIBILITY, ...(raw.guides ?? {}) },
+    // The painted watched bar is newer still; older designs never had one.
+    watchedBar: { ...DEFAULT_WATCHED_BAR, ...(raw.watchedBar ?? {}) },
     objects: (raw.objects ?? []).map(normalizeObject),
   }
 }

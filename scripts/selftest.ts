@@ -2084,6 +2084,54 @@ console.log('outbound links')
   check('the author is named', links.AUTHOR_NAME.trim().length > 0)
 }
 
+// -------------------------------------------------------------- watched bar ---
+console.log('watched bar')
+{
+  const { watchedBarRects, WATCHED_SHARE_RANGE } = await import('../src/data/formats')
+  const { normalizeProject } = await import('../src/engine/normalize')
+  const { DEFAULT_BACKGROUND, DEFAULT_GUIDE_VISIBILITY, DEFAULT_WATCHED_BAR } = await import('../src/types')
+  const base = (extra: Partial<Project> = {}): Project => ({
+    id: 'w',
+    name: 'Watched',
+    format: 'thumbnail',
+    brandId: null,
+    width: 1280,
+    height: 720,
+    safeZone: { top: 4, bottom: 11, left: 3, right: 3, warning: 3 },
+    guides: { ...DEFAULT_GUIDE_VISIBILITY },
+    watchedBar: { on: true, share: 40 },
+    background: { ...DEFAULT_BACKGROUND },
+    objects: [],
+    createdAt: 0,
+    updatedAt: 0,
+    ...extra,
+  })
+
+  const legacy = base() as Partial<Project>
+  delete legacy.watchedBar
+  check('a project saved before the bar loads with it off', normalizeProject(legacy as Project).watchedBar.on === false)
+  check('the default bar is off', DEFAULT_WATCHED_BAR.on === false)
+  check('a saved bar survives a reload', normalizeProject(base()).watchedBar.share === 40)
+
+  const bar = watchedBarRects(base())
+  check('a thumbnail draws the bar', bar !== null)
+  check('the bar runs the full width along the bottom', !!bar && bar.track.width === 1280 && bar.track.y + bar.track.height === 720)
+  check('the bar is YouTube-thin: about 14 px on 1280', !!bar && bar.track.height === 14, String(bar?.track.height))
+  check('the red part covers the watched share', !!bar && Math.abs(bar.played.width - 512) < 0.5)
+  check('switched off, nothing is drawn', watchedBarRects(base({ watchedBar: { on: false, share: 40 } })) === null)
+  check(
+    'a Shorts cover never gets a bar',
+    watchedBarRects(base({ format: 'shorts', width: 1080, height: 1920 })) === null,
+  )
+  check('a banner never gets a bar', watchedBarRects(base({ format: 'banner', width: 2560, height: 1440 })) === null)
+  const low = watchedBarRects(base({ watchedBar: { on: true, share: 0 } }))
+  const high = watchedBarRects(base({ watchedBar: { on: true, share: 100 } }))
+  check(
+    'the share is clamped so the bar always reads part-way',
+    !!low && !!high && low.played.width === (1280 * WATCHED_SHARE_RANGE.min) / 100 && high.played.width < 1280,
+  )
+}
+
 // -------------------------------------------------------------- green screen ---
 console.log('green screen')
 {

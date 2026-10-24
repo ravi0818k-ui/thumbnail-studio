@@ -12,6 +12,7 @@ import type {
   TextObject,
 } from '../types'
 import { getLoadedAsset } from './assets'
+import { watchedBarRects } from '../data/formats'
 import { FILTER_BY_ID, scaleFilter } from '../data/filters'
 import { applyTextFont, drawLine, layoutText, lineGeometry, measureLine, textRasterPadding } from './text'
 
@@ -793,6 +794,21 @@ export function renderProject(ctx: Ctx, project: Project, options: RenderOptions
   ctx.scale(scale, scale)
   if (!options.transparentBackground) drawBackground(ctx, project)
   for (const obj of project.objects) drawObject(ctx, obj, scale)
+  drawWatchedBar(ctx, project)
+  ctx.restore()
+}
+
+/** Above every layer, as YouTube's own bar sits above the thumbnail. */
+function drawWatchedBar(ctx: Ctx, project: Project): void {
+  const bar = watchedBarRects(project)
+  if (!bar) return
+  ctx.save()
+  ctx.globalAlpha = 1
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.35)'
+  ctx.fillRect(bar.track.x, bar.track.y, bar.track.width, bar.track.height)
+  ctx.fillStyle = '#ff0000'
+  ctx.fillRect(bar.played.x, bar.played.y, bar.played.width, bar.played.height)
   ctx.restore()
 }
 
