@@ -2071,7 +2071,13 @@ console.log('brand preset: vivian')
 console.log('outbound links')
 {
   const links = await import('../src/data/links')
-  const all = [links.FEEDBACK_FORM_URL, links.AUTHOR_LINKEDIN_URL]
+  const all = [
+    links.FEEDBACK_FORM_URL,
+    links.AUTHOR_LINKEDIN_URL,
+    links.YOUTUBE_CHANNEL_URL,
+    links.YOUTUBE_SUBSCRIBE_URL,
+    links.TUTORIAL_VIDEO_URL,
+  ]
   // Every one of these is opened in a new tab from a control with no other
   // affordance, so a typo is a dead end nobody can recover from inside the app.
   check(
@@ -2082,6 +2088,11 @@ console.log('outbound links')
   check('the feedback link points at the form itself', links.FEEDBACK_FORM_URL.includes('/viewform'))
   check('the author link is a LinkedIn profile', /linkedin\.com\/in\//.test(links.AUTHOR_LINKEDIN_URL))
   check('the author is named', links.AUTHOR_NAME.trim().length > 0)
+  check('the channel link is a channel, not a video', /youtube\.com\/channel\/UC[\w-]{22}$/.test(links.YOUTUBE_CHANNEL_URL))
+  check('subscribe opens the confirm prompt', links.YOUTUBE_SUBSCRIBE_URL.endsWith('?sub_confirmation=1'))
+  // The embed and the still are both built from the id, so a pasted share URL here would break both.
+  check('the tutorial id is a bare 11-character video id', /^[\w-]{11}$/.test(links.TUTORIAL_VIDEO_ID))
+  check('the duration badge reads like YouTube’s', /^\d+:\d{2}$/.test(links.TUTORIAL_DURATION))
 }
 
 // -------------------------------------------------------------- watched bar ---

@@ -3929,3 +3929,242 @@ button.fp-chip:hover {
   width: 28px;
   height: 28px;
 }
+
+/* ------------------------------------------------------- home tutorial */
+.tutorial {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+  margin: 0 0 34px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 59, 92, 0.16), transparent 55%),
+    radial-gradient(90% 120% at 100% 100%, rgba(79, 140, 255, 0.12), transparent 60%),
+    var(--panel);
+  overflow: hidden;
+}
+
+.tutorial-player {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: var(--shadow);
+}
+
+.tutorial-player iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.tutorial-facade {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  padding: 0;
+  cursor: pointer;
+}
+
+.tutorial-facade img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s ease, filter 0.35s ease;
+}
+
+.tutorial-facade:hover img {
+  transform: scale(1.03);
+  filter: brightness(0.85);
+}
+
+/* The same chrome the Preview dialog draws: New badge and duration. */
+.tutorial-new,
+.tutorial-duration {
+  position: absolute;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tutorial-new {
+  top: 10px;
+  left: 10px;
+}
+
+.tutorial-duration {
+  right: 10px;
+  bottom: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+
+.tutorial-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin: -34px 0 0 -34px;
+  padding-left: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.55), 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: tutorial-pulse 2.2s ease-out infinite;
+  transition: transform 0.2s ease;
+}
+
+.tutorial-facade:hover .tutorial-play {
+  transform: scale(1.1);
+}
+
+@keyframes tutorial-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.55), 0 8px 24px rgba(0, 0, 0, 0.5); }
+  70% { box-shadow: 0 0 0 18px rgba(255, 59, 92, 0), 0 8px 24px rgba(0, 0, 0, 0.5); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0), 0 8px 24px rgba(0, 0, 0, 0.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-play { animation: none; }
+}
+
+.tutorial-copy h2 {
+  margin: 8px 0 6px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  line-height: 1.15;
+}
+
+.tutorial-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* A live dot, so the card reads as fresh content rather than page furniture. */
+.tutorial-eyebrow i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.tutorial-lede {
+  margin: 0 0 14px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tutorial-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.tutorial-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.tutorial-steps li > span {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tutorial-steps b {
+  display: block;
+  font-size: 13px;
+}
+
+.tutorial-steps em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.tutorial-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tutorial-actions a {
+  text-decoration: none;
+}
+
+.tutorial-subscribe:hover {
+  border-color: var(--accent);
+}
+
+@media (max-width: 760px) {
+  .tutorial {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+
+/* Topbar link to the channel. */
+.channel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.channel-link:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.channel-link i {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+}

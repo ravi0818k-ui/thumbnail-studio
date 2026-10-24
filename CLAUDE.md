@@ -440,6 +440,12 @@ stale one. The selftest checks each is an absolute `https` URL. Help is a link r
 because it leaves the app; it sits at the foot of the rail (`margin-top: auto`) so it is never mistaken
 for a drawing tool, and opens in a new tab so an unsaved design is not replaced.
 
+The project's YouTube channel and tutorial live there too. `TutorialCard` on the home screen is a
+**facade**: only the video's still is fetched until someone presses play, then it swaps in a
+`youtube-nocookie` embed — the player and its cookies never load for a visitor who did not ask. It
+draws no watched bar because the video's own thumbnail paints one. The same channel and video are in
+`index.html`'s JSON-LD (`Organization.sameAs`, `VideoObject`); keep those in step with `links.ts`.
+
 ## Conventions
 
 - TypeScript is strict with `noUnusedLocals`/`noUnusedParameters` — an unused import fails the build.

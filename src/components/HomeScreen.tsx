@@ -5,7 +5,8 @@ import { deleteProject, listProjects } from '../storage/db'
 import { ensureAssets } from '../engine/assets'
 import { assetIdsOf } from '../storage/projects'
 import { FORMAT_LIST, formatConfig } from '../data/formats'
-import { AUTHOR_LINKEDIN_URL, AUTHOR_NAME, FEEDBACK_FORM_URL } from '../data/links'
+import { AUTHOR_LINKEDIN_URL, AUTHOR_NAME, FEEDBACK_FORM_URL, YOUTUBE_CHANNEL_URL } from '../data/links'
+import TutorialCard from './TutorialCard'
 
 export default function HomeScreen() {
   const newProject = useEditor((s) => s.newProject)
@@ -42,6 +43,14 @@ export default function HomeScreen() {
         </div>
         <div className="spacer" />
         <span className="muted">Local-first · nothing is uploaded</span>
+        <a className="channel-link" href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noopener noreferrer">
+          <i aria-hidden>
+            <svg viewBox="0 0 24 24" width="10" height="10">
+              <path d="M8 5.5v13l11-6.5z" fill="currentColor" />
+            </svg>
+          </i>
+          Tutorials on YouTube
+        </a>
       </header>
       <div className="home">
         <div className="home-inner">
@@ -50,7 +59,8 @@ export default function HomeScreen() {
             Upload, cut out the background, add big readable text and download — horizontal thumbnails, vertical
             Shorts covers and channel banners, all in your browser.
           </p>
-          <h2 className="h2" style={{ marginTop: 26 }}>
+          <TutorialCard />
+          <h2 className="h2" style={{ marginTop: 0 }}>
             Create new design
           </h2>
           <div className="format-cards">
@@ -149,6 +159,15 @@ export default function HomeScreen() {
               .
             </p>
 
+            <h3>Learn it on YouTube</h3>
+            <p>
+              Tutorials, thumbnail makeovers and design tips go up on the{' '}
+              <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noopener noreferrer">
+                Youtubethumbnail Studio channel
+              </a>
+              . Subscribe to see each new feature as it ships.
+            </p>
+
             <h3>What it does</h3>
             <p>
               Thumbnail Studio is a free thumbnail designer for YouTube — horizontal thumbnails at 1280 × 720 and
@@ -183,7 +202,8 @@ export default function HomeScreen() {
 
             <h3>What gets downloaded</h3>
             <p>
-              Fonts come from Google Fonts. Two optional features fetch what they need from a public CDN the first time
+              Fonts come from Google Fonts, and the tutorial&apos;s preview image from YouTube — its player loads only
+              when you press play. Two optional features fetch what they need from a public CDN the first time
               you use them: the AI background-removal model, and the Python image engine behind the stronger enhance
               tools. Those are ordinary downloads <em>to</em> your browser — no part of your design is sent with the
               request. Once they are cached, the editor keeps working offline.
