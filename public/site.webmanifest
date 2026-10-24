@@ -1,6 +1,8 @@
 {
   "name": "Thumbnail Studio — YouTube Thumbnail Designer",
   "short_name": "Thumbnail Studio",
+  "description": "Free YouTube thumbnail maker and Canva alternative: thumbnails, Shorts covers and channel banners, with no sign-up.",
+  "start_url": "/",
   "icons": [
     { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" }

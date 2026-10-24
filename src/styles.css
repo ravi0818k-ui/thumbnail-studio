@@ -2500,6 +2500,19 @@ button.fp-chip:hover {
 .pv-body.gray .phone-screen img {
   filter: grayscale(1);
 }
+.pv-new {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
 .pv-duration {
   position: absolute;
   right: 4px;
@@ -2512,6 +2525,23 @@ button.fp-chip:hover {
   font-weight: 600;
   line-height: 1.35;
   font-variant-numeric: tabular-nums;
+}
+/* YouTube's resume bar: a translucent track with the watched share in red. */
+.pv-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.pv-progress span {
+  display: block;
+  height: 100%;
+  background: #f00;
+}
+.pv-thumb.watched .pv-duration {
+  bottom: 8px;
 }
 
 /* YouTube's own type scale, so a title that wraps here wraps there too. */

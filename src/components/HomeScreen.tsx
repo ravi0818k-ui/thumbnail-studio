@@ -133,7 +133,7 @@ export default function HomeScreen() {
           <div className="about">
             <h3 style={{ marginTop: 0 }}>Who made this</h3>
             <p>
-              YouTubeThumbnail.org is a free and open-source project created by {AUTHOR_NAME}, a YouTuber and software
+              YouTubeThumbnail.org is a free project created by {AUTHOR_NAME}, a YouTuber and software
               engineer (India).
             </p>
             <p>

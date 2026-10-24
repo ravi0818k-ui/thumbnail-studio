@@ -12,6 +12,12 @@ type Theme = 'dark' | 'light'
 /** Type below this many CSS pixels is not read, it is only glanced at. */
 const LEGIBLE_PX = 10
 
+/**
+ * How far into the video the "watched" bar reaches. A third is enough to read
+ * as a real resume point while leaving most of the bottom edge uncovered.
+ */
+const WATCHED_SHARE = 0.35
+
 const DESCRIPTION =
   'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
 
@@ -30,6 +36,7 @@ export default function PreviewDialog() {
   const [theme, setTheme] = useState<Theme>('dark')
   const [neighbours, setNeighbours] = useState(true)
   const [gray, setGray] = useState(false)
+  const [watched, setWatched] = useState(false)
   const [title, setTitle] = useState(project.name)
 
   const config = formatConfig(project.format)
@@ -56,7 +63,7 @@ export default function PreviewDialog() {
   const renderedPx =
     smallestText === null ? null : (smallestText * smallest.width * surfaceScale(smallest, project.format)) / project.width
 
-  const shared = { url, title, theme, project }
+  const shared = { url, title, theme, project, watched }
 
   return (
     <Modal title="Preview" onClose={close} width={1020}>
@@ -76,6 +83,7 @@ export default function PreviewDialog() {
           ]}
         />
         {!isBanner && <Toggle label="Competing videos" checked={neighbours} onChange={setNeighbours} />}
+        {!isBanner && <Toggle label="Partly watched" checked={watched} onChange={setWatched} />}
         <Toggle label="Grayscale" checked={gray} onChange={setGray} />
       </div>
 
@@ -137,12 +145,13 @@ interface SurfaceProps {
   title: string
   theme: Theme
   neighbours: boolean
+  watched: boolean
   project: { width: number; height: number; format: CanvasFormat }
 }
 
-function Surface({ surface, url, title, neighbours, project }: SurfaceProps) {
+function Surface({ surface, url, title, neighbours, watched, project }: SurfaceProps) {
   const ratio = `${project.width} / ${project.height}`
-  const thumb = <Thumb url={url} width={surface.width} ratio={ratio} />
+  const thumb = <Thumb url={url} width={surface.width} ratio={ratio} watched={watched} />
 
   switch (surface.layout) {
     case 'grid':
@@ -218,7 +227,16 @@ function Surface({ surface, url, title, neighbours, project }: SurfaceProps) {
       return <Immersive url={url} title={title} width={surface.width} />
 
     case 'phone':
-      return <PhoneFeed url={url} title={title} width={surface.width} ratio={ratio} neighbours={neighbours} />
+      return (
+        <PhoneFeed
+          url={url}
+          title={title}
+          width={surface.width}
+          ratio={ratio}
+          neighbours={neighbours}
+          watched={watched}
+        />
+      )
 
     case 'banner':
       return <ChannelHeader url={url} title={title} surface={surface} project={project} />
@@ -285,12 +303,14 @@ function PhoneFeed({
   width,
   ratio,
   neighbours,
+  watched,
 }: {
   url: string
   title: string
   width: number
   ratio: string
   neighbours: boolean
+  watched: boolean
 }) {
   return (
     <div className="pv-device" style={{ width: width + 30 }}>
@@ -304,7 +324,7 @@ function PhoneFeed({
       </div>
       <div className="pv-device-feed">
         <div className="pv-card" style={{ width }}>
-          <Thumb url={url} width={width} ratio={ratio} />
+          <Thumb url={url} width={width} ratio={ratio} watched={watched} />
           <div className="pv-card-meta">
             <span className="pv-avatar" />
             <div>
@@ -319,11 +339,22 @@ function PhoneFeed({
   )
 }
 
-function Thumb({ url, width, ratio }: { url: string; width: number; ratio: string }) {
+function Thumb({ url, width, ratio, watched }: { url: string; width: number; ratio: string; watched: boolean }) {
   return (
-    <div className="pv-thumb" style={{ width, aspectRatio: ratio }}>
+    <div className={`pv-thumb${watched ? ' watched' : ''}`} style={{ width, aspectRatio: ratio }}>
       {url ? <img src={url} alt="" /> : null}
+      {/* YouTube stamps this on anything uploaded in the last week, which is
+          exactly when a thumbnail is earning its impressions — so it covers
+          that corner of the design during the window that matters. */}
+      <span className="pv-new">New</span>
       <span className="pv-duration">14:56</span>
+      {/* A returning viewer sees the bottom edge taken by the resume bar, so
+          anything the design puts down there has to survive being covered. */}
+      {watched && (
+        <span className="pv-progress">
+          <span style={{ width: `${WATCHED_SHARE * 100}%` }} />
+        </span>
+      )}
     </div>
   )
 }
