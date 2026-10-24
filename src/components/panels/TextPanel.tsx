@@ -4,6 +4,9 @@ import { TEXT_PRESETS } from '../../data/textPresets'
 import { measuredTextHeight } from '../../engine/text'
 import { ensureFontLoaded } from '../../data/fonts'
 import { guideRect, innermostGuide } from '../../data/formats'
+import { autoSizePatch } from '../../engine/text'
+import { familyWeights, nearestOf } from '../../engine/customFonts'
+import FontUpload from '../FontUpload'
 import type { TextObject } from '../../types'
 
 export default function TextPanel() {
@@ -38,6 +41,21 @@ export default function TextPanel() {
       return
     }
     await add({ ...preset.apply, text: 'YOUR TEXT' })
+  }
+
+  // A family uploaded while text is selected goes straight onto that text.
+  const applyUploaded = (family: string) => {
+    const state = useEditor.getState()
+    const texts = state.project.objects.filter((o): o is TextObject => o.type === 'text' && state.selection.includes(o.id))
+    if (texts.length === 0) return
+    state.pushHistory()
+    const weights = familyWeights(family) ?? []
+    for (const t of texts) {
+      state.updateObject<TextObject>(t.id, { fontFamily: family, fontWeight: nearestOf(weights, t.fontWeight) })
+      const next = useEditor.getState().project.objects.find((o) => o.id === t.id) as TextObject
+      const sized = autoSizePatch(next)
+      if (Object.keys(sized).length > 0) state.updateObject<TextObject>(t.id, sized)
+    }
   }
 
   return (
@@ -92,6 +110,11 @@ export default function TextPanel() {
       <p className="muted" style={{ marginTop: 10 }}>
         Select a text layer first to restyle it, or click a style to drop in new text.
       </p>
+
+      <div className="section-head" style={{ marginTop: 20 }}>
+        Your fonts
+      </div>
+      <FontUpload onAdded={applyUploaded} />
     </div>
   )
 }

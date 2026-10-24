@@ -3875,3 +3875,57 @@ button.fp-chip:hover {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------- font upload */
+.font-upload-ok {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--ok);
+}
+
+.font-upload-errors {
+  margin: 8px 0 0;
+  padding: 8px 10px 8px 24px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: #ffb3c0;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.font-upload-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.font-upload-row {
+  display: grid;
+  grid-template-columns: 1fr auto 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.font-upload-row span {
+  font-size: 16px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.font-upload-row em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.font-upload-row .icon-btn {
+  width: 28px;
+  height: 28px;
+}

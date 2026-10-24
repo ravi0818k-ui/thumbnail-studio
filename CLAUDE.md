@@ -192,6 +192,25 @@ are load-bearing and easy to undo by accident:
 `focusSelection` in the store is that remembered stroke. It is dropped when the brush is switched off
 and when the properties panel changes layer, since it points at one layer's asset by id.
 
+### Uploaded fonts
+
+The Text panel's **Upload font** (and the link under the Family menu) takes `.ttf`, `.otf`, `.woff`,
+`.woff2` or a whole Google Fonts `.zip`. `engine/fontFile.ts` is pure byte work so the selftest runs it
+in Node; `engine/customFonts.ts` registers faces with `document.fonts`, which is why the canvas, export
+and menus need no font code of their own. Things that are easy to undo:
+
+- **The bytes decide, never the name.** A face must sniff as sfnt/WOFF/WOFF2, parse (a `name` table,
+  tables inside the file), and survive `FontFace.load()` — the browser's sanitiser is the last gate.
+  `.ttc` is refused because `FontFace` takes one face.
+- **Family names go into `ctx.font` inside quotes**, so `safeFamilyName` strips anything that could close
+  the string. A name that collides with `FONTS` is refused rather than shadowing the Google face.
+- **A Google zip carries the variable font and `static/`** with the same faces; static wins, or every
+  weight is listed twice. Every zip entry's declared size is capped before inflating, and the inflated
+  length must match it.
+- **Fonts last for the tab only**, by request. A reopened design naming a missing family keeps the name
+  (the Family menu shows it as "upload again") and draws in the fallback stack. `publish()` clears the
+  raster cache, since a layer may already name the family and have been drawn in that fallback.
+
 ### Icons
 
 `data/icons.ts` is the browse tree and `engine/iconLibrary.ts` the Iconify API client. A leaf carries a

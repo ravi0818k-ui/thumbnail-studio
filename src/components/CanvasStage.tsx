@@ -16,6 +16,7 @@ import {
 } from '../engine/geometry'
 import { applyCropRect, cropFromBox, fullFrameRect, panCrop } from '../engine/crop'
 import { onAssetsChanged, getLoadedAsset } from '../engine/assets'
+import { onCustomFontsChanged } from '../engine/customFonts'
 import { autoSizePatch } from '../engine/text'
 import { fontStack } from '../data/fonts'
 import {
@@ -99,6 +100,7 @@ export default function CanvasStage() {
 
   // Redraw whenever a bitmap finishes decoding.
   useEffect(() => onAssetsChanged(() => forceRender((n) => n + 1)), [])
+  useEffect(() => onCustomFontsChanged(() => forceRender((n) => n + 1)), [])
 
   // ---------------------------------------------------------------- render
   useLayoutEffect(() => {

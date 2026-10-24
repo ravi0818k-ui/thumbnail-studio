@@ -2168,5 +2168,193 @@ console.log('green screen')
   check('the backdrop never asks for the camera or microphone', !/getUserMedia|mediaDevices|getDisplayMedia/.test(source))
 }
 
+// ------------------------------------------------------------- uploaded fonts
+console.log('uploaded fonts')
+{
+  const ff = await import('../src/engine/fontFile')
+
+  // A minimal sfnt: a name table (IDs 1 and 16), OS/2 with weight and
+  // fsSelection, and optionally fvar with a wght axis. Enough for the reader.
+  const utf16 = (t: string) => {
+    const b = new Uint8Array(t.length * 2)
+    for (let i = 0; i < t.length; i++) {
+      b[i * 2] = t.charCodeAt(i) >> 8
+      b[i * 2 + 1] = t.charCodeAt(i) & 255
+    }
+    return b
+  }
+  const nameTable = (names: [number, string][]) => {
+    const strings = names.map(([, t]) => utf16(t))
+    const head = 6 + names.length * 12
+    const out = new Uint8Array(head + strings.reduce((n, s) => n + s.length, 0))
+    const v = new DataView(out.buffer)
+    v.setUint16(2, names.length)
+    v.setUint16(4, head)
+    let offset = 0
+    names.forEach(([id], i) => {
+      const at = 6 + i * 12
+      v.setUint16(at, 3)
+      v.setUint16(at + 2, 1)
+      v.setUint16(at + 4, 0x409)
+      v.setUint16(at + 6, id)
+      v.setUint16(at + 8, strings[i].length)
+      v.setUint16(at + 10, offset)
+      out.set(strings[i], head + offset)
+      offset += strings[i].length
+    })
+    return out
+  }
+  const os2Table = (weight: number, italic: boolean) => {
+    const out = new Uint8Array(96)
+    const v = new DataView(out.buffer)
+    v.setUint16(4, weight)
+    v.setUint16(62, italic ? 1 : 0x40)
+    return out
+  }
+  const fvarTable = (min: number, max: number) => {
+    const out = new Uint8Array(16 + 20)
+    const v = new DataView(out.buffer)
+    v.setUint16(4, 16)
+    v.setUint16(8, 1)
+    v.setUint16(10, 20)
+    out.set([119, 103, 104, 116], 16) // wght
+    v.setInt32(20, min * 65536)
+    v.setInt32(24, 400 * 65536)
+    v.setInt32(28, max * 65536)
+    return out
+  }
+  const sfnt = (tables: Record<string, Uint8Array>, magic = [0, 1, 0, 0]) => {
+    const tags = Object.keys(tables)
+    let offset = 12 + tags.length * 16
+    const out = new Uint8Array(offset + tags.reduce((n, t) => n + tables[t].length, 0))
+    const v = new DataView(out.buffer)
+    out.set(magic, 0)
+    v.setUint16(4, tags.length)
+    tags.forEach((tag, i) => {
+      const at = 12 + i * 16
+      for (let c = 0; c < 4; c++) out[at + c] = tag.charCodeAt(c)
+      v.setUint32(at + 8, offset)
+      v.setUint32(at + 12, tables[tag].length)
+      out.set(tables[tag], offset)
+      offset += tables[tag].length
+    })
+    return out
+  }
+  const refuses = async (run: () => Promise<unknown>) => {
+    try {
+      await run()
+      return false
+    } catch (err) {
+      return err instanceof ff.FontFileError
+    }
+  }
+
+  const black = sfnt({ name: nameTable([[1, 'Roboto Black'], [16, 'Roboto']]), 'OS/2': os2Table(900, false) })
+  const info = await ff.readFontInfo(black)
+  check('a TrueType face is recognised by its bytes', ff.sniffFont(black) === 'ttf')
+  check('the typographic family wins over the legacy one', info.family === 'Roboto', String(info.family))
+  check('weight comes from OS/2', info.weight === 900 && !info.italic && !info.variable)
+
+  const italic = await ff.readFontInfo(sfnt({ name: nameTable([[1, 'Lobster']]), 'OS/2': os2Table(400, true) }, [79, 84, 84, 79]))
+  check('an OpenType face with only name ID 1 still has a family', italic.kind === 'otf' && italic.family === 'Lobster')
+  check('fsSelection marks the face italic', italic.italic)
+
+  const variable = await ff.readFontInfo(
+    sfnt({ name: nameTable([[1, 'Inter Tight']]), 'OS/2': os2Table(400, false), fvar: fvarTable(100, 900) }),
+  )
+  check('a variable face reports its weight range', variable.variable && JSON.stringify(variable.weight) === '[100,900]')
+
+  const hostile = await ff.readFontInfo(sfnt({ name: nameTable([[1, 'Evil"; } body{x:']]), 'OS/2': os2Table(400, false) }))
+  check('a family name cannot break out of a CSS font string', !!hostile.family && !/["\\;{}:]/.test(hostile.family), String(hostile.family))
+
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10, 0, 0, 0, 13])
+  check('a PNG renamed .ttf is not a font', ff.sniffFont(png) === null)
+  check('reading a non-font throws a FontFileError', await refuses(() => ff.readFontInfo(png)))
+  check('a face with no name table is refused', await refuses(() => ff.readFontInfo(sfnt({ 'OS/2': os2Table(400, false) }))))
+  check('a truncated face is refused, not read past its end', await refuses(() => ff.readFontInfo(black.subarray(0, 40))))
+  check('a collection is identified so it can be refused', ff.sniffFont(new Uint8Array([116, 116, 99, 102, 0, 0, 0, 0, 0, 0, 0, 0])) === 'ttc')
+
+  const g = ff.guessFromFileName('static/OpenSans-SemiBoldItalic.woff2')
+  check('a file name yields family, weight and style', g.family === 'Open Sans' && g.weight === 600 && g.italic, JSON.stringify(g))
+  check('extra bold is not read as bold', ff.guessFromFileName('Poppins-ExtraBold.ttf').weight === 800)
+  check('a plain name is regular', ff.guessFromFileName('Lobster.ttf').weight === 400)
+  check('the picker accepts fonts and zips only', ff.FONT_ACCEPT === '.ttf,.otf,.woff,.woff2,.zip')
+
+  // A zip like Google's: a stored and a deflated font, a stray licence and macOS junk.
+  const deflate = async (b: Uint8Array) =>
+    new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer())
+  const zipOf = async (files: { name: string; bytes: Uint8Array; deflated?: boolean; size?: number }[]) => {
+    const parts: Uint8Array[] = []
+    const centrals: Uint8Array[] = []
+    let offset = 0
+    for (const f of files) {
+      const name = new TextEncoder().encode(f.name)
+      const data = f.deflated ? await deflate(f.bytes) : f.bytes
+      const size = f.size ?? f.bytes.length
+      const method = f.deflated ? 8 : 0
+      const local = new Uint8Array(30 + name.length + data.length)
+      const lv = new DataView(local.buffer)
+      lv.setUint32(0, 0x04034b50, true)
+      lv.setUint16(8, method, true)
+      lv.setUint32(18, data.length, true)
+      lv.setUint32(22, size, true)
+      lv.setUint16(26, name.length, true)
+      local.set(name, 30)
+      local.set(data, 30 + name.length)
+      const central = new Uint8Array(46 + name.length)
+      const cv = new DataView(central.buffer)
+      cv.setUint32(0, 0x02014b50, true)
+      cv.setUint16(10, method, true)
+      cv.setUint32(20, data.length, true)
+      cv.setUint32(24, size, true)
+      cv.setUint16(28, name.length, true)
+      cv.setUint32(42, offset, true)
+      central.set(name, 46)
+      parts.push(local)
+      centrals.push(central)
+      offset += local.length
+    }
+    const cdSize = centrals.reduce((n, c) => n + c.length, 0)
+    const end = new Uint8Array(22)
+    const ev = new DataView(end.buffer)
+    ev.setUint32(0, 0x06054b50, true)
+    ev.setUint16(8, files.length, true)
+    ev.setUint16(10, files.length, true)
+    ev.setUint32(12, cdSize, true)
+    ev.setUint32(16, offset, true)
+    const out = new Uint8Array(offset + cdSize + 22)
+    let at = 0
+    for (const part of [...parts, ...centrals, end]) {
+      out.set(part, at)
+      at += part.length
+    }
+    return out
+  }
+  const zip = await zipOf([
+    { name: 'OFL.txt', bytes: new TextEncoder().encode('licence') },
+    { name: 'static/Roboto-Black.ttf', bytes: black },
+    { name: 'static/Roboto-Bold.ttf', bytes: black, deflated: true },
+    { name: '__MACOSX/static/._Roboto-Bold.ttf', bytes: black },
+  ])
+  check('a zip is recognised by its bytes', ff.isZip(zip) && !ff.isZip(black))
+  const entries = await ff.fontsInZip(zip)
+  check(
+    'only the fonts come out of a zip, stored or deflated',
+    entries.map((e) => e.name).join() === 'static/Roboto-Black.ttf,static/Roboto-Bold.ttf',
+    entries.map((e) => e.name).join(),
+  )
+  check(
+    'a deflated font inflates byte for byte',
+    entries[1]?.bytes.length === black.length && entries[1].bytes.every((b, i) => b === black[i]),
+  )
+  const bomb = await zipOf([{ name: 'Huge.ttf', bytes: black, size: ff.MAX_FONT_BYTES + 1 }])
+  check('an entry declaring more than the size cap is never inflated', (await ff.fontsInZip(bomb)).length === 0)
+  check(
+    'an entry that inflates past its declared size is refused',
+    await refuses(async () => ff.fontsInZip(await zipOf([{ name: 'Liar.ttf', bytes: black, deflated: true, size: 10 }]))),
+  )
+  check('a cut-off zip is refused', await refuses(() => ff.fontsInZip(zip.subarray(0, zip.length - 30))))
+}
+
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)
 process.exit(failures === 0 ? 0 : 1)

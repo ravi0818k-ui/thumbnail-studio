@@ -6,6 +6,8 @@ import { FONTS, FONT_CATEGORIES, ensureFontLoaded } from '../../data/fonts'
 import { TEXT_PRESETS } from '../../data/textPresets'
 import { autoSizePatch } from '../../engine/text'
 import { SWATCHES } from '../../data/backgrounds'
+import { familyWeights, nearestOf, useCustomFonts } from '../../engine/customFonts'
+import FontUpload from '../FontUpload'
 
 export default function TextProperties({ object }: { object: TextObject }) {
   const updateObject = useEditor((s) => s.updateObject)
@@ -19,7 +21,17 @@ export default function TextProperties({ object }: { object: TextObject }) {
     if (Object.keys(sized).length > 0) updateObject<TextObject>(object.id, sized)
   }
 
-  const font = FONTS.find((f) => f.family === object.fontFamily) ?? FONTS[0]
+  const uploaded = useCustomFonts()
+  const weights = familyWeights(object.fontFamily)
+  // Fonts last only for the tab, so a reopened design can name one that is gone.
+  const missing = weights === null
+
+  const chooseFamily = async (family: string) => {
+    pushHistory()
+    const fontWeight = nearestOf(familyWeights(family) ?? [], object.fontWeight)
+    await ensureFontLoaded(family, fontWeight, object.fontSize)
+    set({ fontFamily: family, fontWeight })
+  }
 
   return (
     <>
@@ -115,13 +127,22 @@ export default function TextProperties({ object }: { object: TextObject }) {
           <select
             className="select"
             value={object.fontFamily}
-            onChange={async (e) => {
-              pushHistory()
-              const family = e.target.value
-              await ensureFontLoaded(family, object.fontWeight, object.fontSize)
-              set({ fontFamily: family })
-            }}
+            onChange={(e) => chooseFamily(e.target.value)}
           >
+            {missing && (
+              <option value={object.fontFamily} disabled>
+                {object.fontFamily} (upload again)
+              </option>
+            )}
+            {uploaded.length > 0 && (
+              <optgroup label="Uploaded">
+                {uploaded.map((f) => (
+                  <option key={f.family} value={f.family}>
+                    {f.family}
+                  </option>
+                ))}
+              </optgroup>
+            )}
             {FONT_CATEGORIES.map((category) => (
               <optgroup key={category} label={category}>
                 {FONTS.filter((f) => f.category === category).map((f) => (
@@ -133,6 +154,9 @@ export default function TextProperties({ object }: { object: TextObject }) {
             ))}
           </select>
         </Field>
+        <div style={{ margin: '-2px 0 10px' }}>
+          <FontUpload compact onAdded={chooseFamily} />
+        </div>
         <Field label="Weight">
           <select
             className="select"
@@ -144,7 +168,7 @@ export default function TextProperties({ object }: { object: TextObject }) {
               set({ fontWeight: weight })
             }}
           >
-            {font.weights.map((w) => (
+            {(weights ?? [object.fontWeight]).map((w) => (
               <option key={w} value={w}>
                 {w}
               </option>
