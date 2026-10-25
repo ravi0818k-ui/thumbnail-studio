@@ -1149,6 +1149,39 @@ console.log('run a test')
   check('an empty design reports no layers', emptyScene.layers === 0 && emptyScene.objects.length === 0)
   check('an empty design is labelled wordless', emptyScene.labels.some((l) => l.label === 'Wordless'))
 
+  // --- the New chip -------------------------------------------------------
+  // YouTube stamps it top-left for the first week; text under it is a fail.
+  {
+    const { newBadgeRect, NEW_BADGE } = await import('../src/data/formats')
+    const { occlusionRects } = await import('../src/engine/thumbnailScore')
+    const corner = design([createText({ text: 'MISTAKE', fontSize: 90, x: 20, y: 20, width: 400, height: 110 })])
+    const middle = design([createText({ text: 'MISTAKE', fontSize: 90, x: 400, y: 300, width: 400, height: 110 })])
+    const badge = newBadgeRect(corner)
+    check('a thumbnail gets the New chip', badge !== null)
+    check(
+      'the chip is the top-left corner',
+      !!badge && badge[0] < 0.05 && badge[1] < 0.1 && badge[0] + badge[2] < 0.2 && badge[1] + badge[3] < 0.25,
+      JSON.stringify(badge),
+    )
+    check(
+      'the chip keeps its pixel size on the reference card',
+      !!badge && Math.abs(badge[2] * NEW_BADGE.cardWidth - NEW_BADGE.width) < 1e-9,
+    )
+    check('Shorts and banners get no chip', !newBadgeRect({ ...corner, format: 'shorts' }) && !newBadgeRect({ ...corner, format: 'banner' }))
+    check('text under the chip is reported', tt.sceneReport(corner).newBadge?.covers.length === 1)
+    check('text clear of the chip passes', tt.sceneReport(middle).newBadge?.covers.length === 0)
+    check(
+      'hidden text under the chip is not reported',
+      tt.sceneReport({ ...corner, objects: corner.objects.map((o) => ({ ...o, hidden: true })) }).newBadge?.covers.length === 0,
+    )
+    check('a Shorts cover has no chip report', tt.sceneReport({ ...corner, format: 'shorts' }).newBadge === null)
+    check(
+      'the scorer treats the chip as covered',
+      occlusionRects(corner).mobile.some((r) => badge !== null && r.every((v, i) => v === badge[i])),
+    )
+    check('boxes touching edge-to-edge do not overlap', !tt.overlaps([0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5]))
+  }
+
   // --- the headline number ------------------------------------------------
   const fakeReport = {
     score: {

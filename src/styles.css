@@ -433,6 +433,22 @@ textarea {
   gap: 8px;
 }
 
+/* A paired field (X/Y, W/H) has half the width, so the 78 px label column
+   would push its input out of the panel. */
+.grid-2 > .field,
+.grid-3 > .field {
+  min-width: 0;
+}
+.grid-2 > .field > label,
+.grid-3 > .field > label {
+  width: auto;
+}
+.grid-2 > .field > .input,
+.grid-3 > .field > .input {
+  flex: 1;
+  width: auto;
+}
+
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -2500,17 +2516,25 @@ button.fp-chip:hover {
 .pv-body.gray .phone-screen img {
   filter: grayscale(1);
 }
+/* YouTube's own chip: a white pill, top-left. NEW_BADGE in formats.ts holds
+   these numbers, and the test report checks text against them. */
 .pv-new {
   position: absolute;
-  left: 4px;
-  top: 4px;
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 11px;
+  left: 8px;
+  top: 8px;
+  height: 20px;
+  min-width: 36px;
+  box-sizing: border-box;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: #fff;
+  color: #0f0f0f;
+  font-family: Roboto, Arial, sans-serif;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 20px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .pv-duration {
@@ -2937,6 +2961,56 @@ button.fp-chip:hover {
   background: #f97316;
   color: #2a1200;
 }
+.tt-box.badge {
+  border-color: #fff;
+  border-style: dashed;
+}
+.tt-box.badge i {
+  /* The chip sits against the top edge, so its tag goes underneath. */
+  top: auto;
+  bottom: -2px;
+  transform: translateY(100%);
+  border-radius: 0 0 2px 2px;
+  background: #fff;
+  color: #0f0f0f;
+}
+.tt-box.badge.bad {
+  border-color: var(--poor);
+}
+.tt-box.badge.bad i {
+  background: var(--poor);
+  color: #fff;
+}
+
+.tt-new-chip {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #fff;
+  color: #0f0f0f;
+  font-size: 11px;
+  font-weight: 700;
+}
+.tt-check-head b.tt-verdict {
+  width: auto;
+  margin-left: auto;
+}
+.tt-summary p.tt-badge-warn {
+  color: var(--poor);
+}
+.tt-summary p.tt-badge-warn b {
+  color: var(--poor);
+}
+.tt-badge-warn .tt-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 /* --- the phone beside every test */
 
@@ -2996,6 +3070,18 @@ button.fp-chip:hover {
 }
 .tt-phone-thumb.ghost {
   background: #1f1f1f;
+}
+.tt-phone-new {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  background: #fff;
+  color: #0f0f0f;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
 }
 .tt-phone-duration {
   position: absolute;
@@ -3986,7 +4072,7 @@ button.fp-chip:hover {
   filter: brightness(0.85);
 }
 
-/* The same chrome the Preview dialog draws: New badge and duration. */
+/* The same chrome the Preview dialog draws: New chip and duration. */
 .tutorial-new,
 .tutorial-duration {
   position: absolute;
@@ -4001,6 +4087,11 @@ button.fp-chip:hover {
 .tutorial-new {
   top: 10px;
   left: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #fff;
+  color: #0f0f0f;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .tutorial-duration {

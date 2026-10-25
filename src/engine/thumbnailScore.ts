@@ -1,6 +1,6 @@
 import type { Project, TextObject } from '../types'
 import { boundingRect } from './geometry'
-import { safeZoneRects } from '../data/formats'
+import { newBadgeRect, safeZoneRects } from '../data/formats'
 
 // ---------------------------------------------------------------------------
 // Thumbnail scoring. The measurements are made in Python over the rendered
@@ -152,9 +152,12 @@ export function occlusionRects(project: Project): Record<string, number[][]> {
   if (x > 0.001) bands.push([0, 0, x, 1])
   if (x + w < 0.999) bands.push([x + w, 0, 1 - (x + w), 1])
 
-  // Every surface stamps the duration over the bottom-right corner.
+  // Every surface stamps the duration over the bottom-right corner, and a
+  // fresh upload gets the New chip in the top-left one.
   const duration = [0.78, 0.86, 0.22, 0.14]
-  return { desktop: [...bands, duration], mobile: [...bands, duration] }
+  const badge = newBadgeRect(project)
+  const chips = badge ? [duration, badge] : [duration]
+  return { desktop: [...bands, ...chips], mobile: [...bands, ...chips] }
 }
 
 /** The weakest metric on a platform, which is the one worth acting on. */

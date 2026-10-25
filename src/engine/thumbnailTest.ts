@@ -1,5 +1,6 @@
 import type { ImageObject, Project, SceneObject, ShapeObject, TextObject } from '../types'
 import { boundingRect } from './geometry'
+import { newBadgeRect } from '../data/formats'
 import { verdict, type RawReport, type Verdict } from './thumbnailScore'
 
 // ---------------------------------------------------------------------------
@@ -335,6 +336,29 @@ export interface SceneReport {
   layers: number
   fonts: string[]
   words: number
+  /** YouTube's New chip and the visible text it lands on; null for a format it is never stamped on. */
+  newBadge: NewBadgeReport | null
+}
+
+export interface NewBadgeReport {
+  box: number[]
+  covers: TextRow[]
+}
+
+/** Whether two normalised [x, y, w, h] boxes share any area. */
+export function overlaps(a: number[], b: number[]): boolean {
+  return a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3]
+}
+
+/**
+ * The New chip against the text. A text box is the layer's whole rectangle,
+ * not its ink, so a short word in a wide box can be reported when the letters
+ * themselves clear the chip — erring that way keeps the corner honest.
+ */
+export function newBadgeReport(project: Project, text: TextRow[]): NewBadgeReport | null {
+  const box = newBadgeRect(project)
+  if (!box) return null
+  return { box, covers: text.filter((t) => !t.hidden && t.text.trim().length > 0 && overlaps(box, t.box)) }
 }
 
 /** The width the smallest mobile row gives a thumbnail; see previewSurfaces. */
@@ -435,6 +459,7 @@ export function sceneReport(project: Project): SceneReport {
     layers: visible.length,
     fonts,
     words,
+    newBadge: newBadgeReport(project, text),
   }
 }
 

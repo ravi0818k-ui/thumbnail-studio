@@ -5,6 +5,8 @@ import { renderToCanvas } from '../engine/renderer'
 import { testProject } from '../engine/runTest'
 import { PYTHON_DOWNLOAD_MB, onPythonStatus, pythonStatus } from '../engine/pythonImage'
 import { METRIC_INFO, PLATFORM_INFO, verdict, type RawPlatform } from '../engine/thumbnailScore'
+import { formatConfig } from '../data/formats'
+import type { CanvasFormat } from '../types'
 import {
   ACT_ON,
   CHECK_INFO,
@@ -15,6 +17,7 @@ import {
   headline,
   sceneReport,
   type GroupId,
+  type NewBadgeReport,
   type ObjectRow,
   type TestReport,
   type VisionCheck,
@@ -120,6 +123,14 @@ export default function TestDialog() {
                   Weakest first: {top!.failing.slice(0, 3).map((c) => CHECK_INFO[c.id].label).join(', ')}.
                 </p>
               )}
+              {scene.newBadge && scene.newBadge.covers.length > 0 && (
+                <p className="tt-badge-warn">
+                  <b>The New chip covers text.</b>{' '}
+                  <button className="tt-link" onClick={() => setGroup('text')}>
+                    See the Text tab
+                  </button>
+                </p>
+              )}
               <button className="btn small" disabled={busy} onClick={() => void run()}>
                 {busy ? 'Testing…' : 'Run again'}
               </button>
@@ -195,6 +206,36 @@ function PlatformDial({ platform }: { platform: RawPlatform }) {
   )
 }
 
+/**
+ * YouTube stamps "New" over the top-left corner for the first week, which is
+ * when a thumbnail earns most of its impressions. Read from the layer boxes,
+ * so it is a pass or a fail rather than a score.
+ */
+function NewBadgeRow({ badge }: { badge: NewBadgeReport }) {
+  const words = badge.covers.map((t) => `“${t.text.trim().slice(0, 40)}”`)
+  return (
+    <div className={`tt-check ${words.length === 0 ? 'good' : 'poor'}`}>
+      <div className="tt-check-head">
+        <span className="tt-check-label">
+          <span className="tt-new-chip">New</span> chip clear of text
+        </span>
+        <b className="tt-verdict">{words.length === 0 ? 'Pass' : 'Fix'}</b>
+      </div>
+      <p className="tt-reading">
+        {words.length === 0
+          ? 'No text sits under the New chip YouTube puts in the top-left corner.'
+          : `The New chip lands on ${words.join(', ')}.`}
+      </p>
+      {words.length > 0 && (
+        <p className="tt-fix">
+          YouTube shows this chip for about a week after upload — the week a thumbnail earns most of its impressions.
+          Move that text down or right until it clears the top-left corner, or open Preview to see it covered.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function CheckRow({ check }: { check: VisionCheck }) {
   const info = CHECK_INFO[check.id]
   if (check.score === null) {
@@ -262,6 +303,10 @@ function Annotated({
     for (const row of report.vision.text_backing) {
       boxes.push({ box: row.box, label: `varies ${(row.variation * 100).toFixed(1)}%`, kind: 'text' })
     }
+    if (scene.newBadge) {
+      const covered = scene.newBadge.covers.length > 0
+      boxes.push({ box: scene.newBadge.box, label: covered ? 'New chip · covers text' : 'New chip', kind: covered ? 'badge bad' : 'badge' })
+    }
   }
 
   return (
@@ -298,7 +343,7 @@ function Annotated({
  * designer can look at, so the mobile view sits beside every test rather than
  * behind a toggle.
  */
-function MobileView({ url, project }: { url: string; project: { width: number; height: number } }) {
+function MobileView({ url, project }: { url: string; project: { width: number; height: number; format: CanvasFormat } }) {
   return (
     <figure className="tt-phone-figure">
       <div className="tt-phone">
@@ -311,6 +356,7 @@ function MobileView({ url, project }: { url: string; project: { width: number; h
           <div className="tt-phone-card">
             <div className="tt-phone-thumb" style={{ aspectRatio: `${project.width} / ${project.height}` }}>
               {url && <img src={url} alt="" />}
+              {formatConfig(project.format).newBadge && <span className="tt-phone-new">New</span>}
               <span className="tt-phone-duration">14:56</span>
             </div>
             <div className="tt-phone-meta">
@@ -422,6 +468,8 @@ function GroupDetail({
   if (group === 'text') {
     if (scene.text.length === 0) return <p className="muted">No text layers in this design.</p>
     return (
+      <>
+      {scene.newBadge && <NewBadgeRow badge={scene.newBadge} />}
       <table className="tt-table">
         <thead>
           <tr>
@@ -447,6 +495,7 @@ function GroupDetail({
           ))}
         </tbody>
       </table>
+      </>
     )
   }
 

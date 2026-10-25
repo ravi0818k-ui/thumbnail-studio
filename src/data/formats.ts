@@ -70,6 +70,12 @@ export interface FormatConfig {
    * as a mistake rather than as a half-watched video.
    */
   watchedBar: boolean
+  /**
+   * Whether YouTube stamps its "New" chip on the top-left corner. It does so on
+   * horizontal video cards for about a week after upload, which is exactly when
+   * a thumbnail is earning its impressions.
+   */
+  newBadge: boolean
   /** Device crop guides, outermost first. Replaces the inset safe zone. */
   guides?: DeviceGuide[]
 }
@@ -116,6 +122,7 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     resizable: true,
     scored: true,
     watchedBar: true,
+    newBadge: true,
   },
   shorts: {
     id: 'shorts',
@@ -141,6 +148,7 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     resizable: true,
     scored: true,
     watchedBar: false,
+    newBadge: false,
   },
   banner: {
     id: 'banner',
@@ -162,6 +170,7 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     resizable: false,
     scored: false,
     watchedBar: false,
+    newBadge: false,
     guides: BANNER_GUIDES,
   },
 }
@@ -247,4 +256,24 @@ export function watchedBarRects(
     track: { x: 0, y, width: project.width, height },
     played: { x: 0, y, width: project.width * share, height },
   }
+}
+
+/**
+ * YouTube's "New" chip in CSS pixels: a white pill in the top-left corner. The
+ * Preview dialog's `.pv-new` draws it at these numbers. It is a fixed size, so
+ * it is judged on a 290 px desktop home-feed card; on a narrower row it covers
+ * proportionally more, which is why text should clear it with room to spare.
+ */
+export const NEW_BADGE = { inset: 8, width: 36, height: 20, cardWidth: 290 }
+
+/** Where the New chip lands, as a normalised [x, y, w, h], or null for a format YouTube never stamps. */
+export function newBadgeRect(project: Pick<Project, 'format' | 'width' | 'height'>): number[] | null {
+  if (!formatConfig(project.format).newBadge) return null
+  const cardHeight = (NEW_BADGE.cardWidth * project.height) / project.width
+  return [
+    NEW_BADGE.inset / NEW_BADGE.cardWidth,
+    NEW_BADGE.inset / cardHeight,
+    NEW_BADGE.width / NEW_BADGE.cardWidth,
+    NEW_BADGE.height / cardHeight,
+  ]
 }

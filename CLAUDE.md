@@ -59,6 +59,12 @@ is the one place its geometry lives, and it returns null unless the format's `wa
 only the horizontal thumbnail, because YouTube draws no resume bar on Shorts or banners. The Preview
 dialog hides its simulated "Partly watched" bar when one is painted, so the two never stack.
 
+**The New chip is chrome, judged against text.** YouTube stamps a white "New" pill top-left on a fresh
+horizontal upload. `NEW_BADGE` / `newBadgeRect()` in `formats.ts` (gated by the format's `newBadge` flag)
+are its one geometry: Preview's `.pv-new` draws it at those numbers, `occlusionRects` hands it to the
+scorer, and `sceneReport().newBadge` lists the visible text layers it lands on, which the test report's
+Text tab shows as a pass/fail. It is never painted by `renderProject`.
+
 A banner starts on `background.kind === 'none'` (transparent). JPEG cannot store alpha, so
 `exportCanvas` and `projectThumbnail` flatten onto white rather than letting the encoder write black.
 
