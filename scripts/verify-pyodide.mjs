@@ -19,6 +19,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE = path.join(ROOT, 'src', 'python', 'enhance.py')
 const SCORE_SOURCE = path.join(ROOT, 'src', 'python', 'score.py')
 const VISION_SOURCE = path.join(ROOT, 'src', 'python', 'vision.py')
+const MATTE_SOURCE = path.join(ROOT, 'src', 'python', 'matte.py')
 const PY_DIR = '/thumbnail-studio'
 
 // Mirrors BRIDGE in src/workers/pyImage.worker.ts.
@@ -32,6 +33,7 @@ sys.path.insert(0, ${JSON.stringify(PY_DIR)})
 import enhance
 import score
 import vision
+import matte
 
 _size = [0, 0]
 
@@ -54,6 +56,16 @@ def _analyze(buf, width, height, params_json):
     params = json.loads(params_json)
     report = score.analyze(data, params.get("regions") or [], params.get("occlusion") or {})
     return to_js(json.dumps(report))
+
+def _matte(mode, buf, width, height, first_buf, second_buf, options_json):
+    data = np.frombuffer(buf.to_py(), dtype=np.uint8).reshape(height, width, 4)
+    first = np.frombuffer(first_buf.to_py(), dtype=np.uint8).reshape(height, width)
+    # JsNull, not None, for an absent mask — see _run.
+    second = None
+    if hasattr(second_buf, "to_py"):
+        second = np.frombuffer(second_buf.to_py(), dtype=np.uint8).reshape(height, width)
+    out, info = matte.run(mode, data, first, second, json.loads(options_json))
+    return to_js([np.ascontiguousarray(out).tobytes(), json.dumps(info)])
 
 def _inspect(buf, width, height, params_json):
     data = np.frombuffer(buf.to_py(), dtype=np.uint8).reshape(height, width, 4)
@@ -130,10 +142,38 @@ function makeRegion() {
   return mask
 }
 
+/**
+ * A dark disc with a soft "model mask" around it, on a light backdrop, plus a
+ * refine stroke over its top edge. Enough for the matte to have real work.
+ */
+function makeCutoutScene(width, height) {
+  const image = new Uint8Array(width * height * 4)
+  const coarse = new Uint8Array(width * height)
+  const stroke = new Uint8Array(width * height)
+  const cx = width / 2
+  const cy = height / 2
+  const r = Math.min(width, height) * 0.3
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x
+      const d = Math.hypot(x - cx, y - cy)
+      const inside = d <= r
+      image[i * 4] = inside ? 30 : 220
+      image[i * 4 + 1] = inside ? 24 : 150
+      image[i * 4 + 2] = inside ? 20 : 60
+      image[i * 4 + 3] = 255
+      coarse[i] = Math.round(255 * Math.max(0, Math.min(1, (r * 1.15 - d) / (r * 0.3))))
+      stroke[i] = Math.hypot(x - cx, y - (cy - r)) <= r * 0.3 ? 255 : 0
+    }
+  }
+  return { image, coarse, stroke }
+}
+
 async function main() {
   const source = await readFile(SOURCE, 'utf8')
   const scoreSource = await readFile(SCORE_SOURCE, 'utf8')
   const visionSource = await readFile(VISION_SOURCE, 'utf8')
+  const matteSource = await readFile(MATTE_SOURCE, 'utf8')
   const image = makeImage()
 
   console.log('pyodide: boot')
@@ -147,12 +187,14 @@ async function main() {
   pyodide.FS.writeFile(`${PY_DIR}/enhance.py`, source, { encoding: 'utf8' })
   pyodide.FS.writeFile(`${PY_DIR}/score.py`, scoreSource, { encoding: 'utf8' })
   pyodide.FS.writeFile(`${PY_DIR}/vision.py`, visionSource, { encoding: 'utf8' })
+  pyodide.FS.writeFile(`${PY_DIR}/matte.py`, matteSource, { encoding: 'utf8' })
   pyodide.runPython(BRIDGE)
   console.log(`  ok   runtime + numpy + pillow ready in ${((Date.now() - started) / 1000).toFixed(1)}s`)
 
   check('enhance.py imports as a module', pyodide.runPython('len(enhance.OPS)') === 13)
   check('score.py imports enhance the way CPython does', pyodide.runPython('len(score.METRICS)') === 7)
   check('vision.py imports both modules', pyodide.runPython('len(vision.CHECKS)') === 8)
+  check('matte.py imports enhance the way CPython does', pyodide.runPython('callable(matte.run)') === true)
   check('numpy is the WebAssembly build', String(pyodide.runPython('import numpy; numpy.__version__')).length > 0)
   check('Pillow is available for Lanczos', pyodide.runPython('from PIL import Image; hasattr(Image, "LANCZOS")') === true)
 
@@ -345,6 +387,60 @@ out.tofile(${JSON.stringify(path.join(dir, 'out_focus_blur.bin'))})
       )
     }
   }
+
+  // The background remover's matte: two masks across the FFI, one of them
+  // possibly null, and a [bytes, json] pair back.
+  const matteRun = pyodide.globals.get('_matte')
+  const scene = makeCutoutScene(WIDTH, HEIGHT)
+  const [cutBytes, cutJson] = unwrap(matteRun('cutout', scene.image, WIDTH, HEIGHT, scene.coarse, null, '{}'))
+  const cut = Buffer.from(unwrap(cutBytes))
+  check('matte cutout returns RGBA at image size', cut.length === WIDTH * HEIGHT * 4, String(cut.length))
+  check('a null person mask crosses the FFI as no mask', JSON.parse(String(cutJson)).person === false)
+  const [, personJson] = unwrap(
+    matteRun('cutout', scene.image, WIDTH, HEIGHT, scene.coarse, scene.coarse, JSON.stringify({ person_only: true })),
+  )
+  check('a person mask crosses the FFI', JSON.parse(String(personJson)).person === true, String(personJson))
+  const centre = ((HEIGHT >> 1) * WIDTH + (WIDTH >> 1)) * 4 + 3
+  check('the matte keeps the subject', cut[centre] === 255, String(cut[centre]))
+  check('the matte clears the corner', cut[3] === 0, String(cut[3]))
+  const cutAlpha = new Uint8Array(WIDTH * HEIGHT).map((_, i) => cut[i * 4 + 3])
+  const [refBytes] = unwrap(
+    matteRun('refine', scene.image, WIDTH, HEIGHT, cutAlpha, scene.stroke, JSON.stringify({ side: HEIGHT })),
+  )
+  const refined = Buffer.from(unwrap(refBytes))
+  let outsideChanged = 0
+  for (let i = 0; i < WIDTH * HEIGHT; i++) if (!scene.stroke[i] && refined[i * 4 + 3] !== cut[i * 4 + 3]) outsideChanged++
+  check('matte refine leaves alpha outside the stroke alone', outsideChanged === 0, `${outsideChanged} pixels`)
+
+  await writeFile(path.join(dir, 'scene.bin'), Buffer.from(scene.image))
+  await writeFile(path.join(dir, 'coarse.bin'), Buffer.from(scene.coarse))
+  const matteScript = `
+import sys
+import numpy as np
+sys.path.insert(0, ${JSON.stringify(path.join(ROOT, 'src', 'python'))})
+import matte
+data = np.fromfile(${JSON.stringify(path.join(dir, 'scene.bin'))}, dtype=np.uint8).reshape(${HEIGHT}, ${WIDTH}, 4)
+coarse = np.fromfile(${JSON.stringify(path.join(dir, 'coarse.bin'))}, dtype=np.uint8).reshape(${HEIGHT}, ${WIDTH})
+out, _ = matte.run("cutout", data, coarse, None, {})
+np.ascontiguousarray(out).tofile(${JSON.stringify(path.join(dir, 'out_matte.bin'))})
+`
+  await writeFile(path.join(dir, 'reference_matte.py'), matteScript)
+  const matteReference = spawnSync('python', [path.join(dir, 'reference_matte.py')], { encoding: 'utf8' })
+  if (matteReference.status === 0) {
+    const expected = await readFile(path.join(dir, 'out_matte.bin'))
+    let maxDelta = 0
+    for (let i = 0; i < expected.length; i++) maxDelta = Math.max(maxDelta, Math.abs(expected[i] - cut[i]))
+    // Pillow resamples the wide means; a 1-LSB split between builds is fair.
+    check('the matte matches desktop CPython', maxDelta <= 1, `max delta ${maxDelta}`)
+  } else {
+    console.log(`  skip  matte CPython comparison (${(matteReference.stderr || '').trim().split('\n').pop()})`)
+  }
+
+  // What a creator waits for: a full-size cut-out under WebAssembly.
+  const big = makeCutoutScene(1920, 1440)
+  const timed = Date.now()
+  unwrap(matteRun('cutout', big.image, 1920, 1440, big.coarse, null, '{}'))
+  console.log(`  info  1920 × 1440 cut-out took ${((Date.now() - timed) / 1000).toFixed(1)} s in Pyodide`)
 
   console.log(failures === 0 ? '\nPyodide verification passed.' : `\n${failures} pyodide check(s) failed.`)
   process.exit(failures === 0 ? 0 : 1)

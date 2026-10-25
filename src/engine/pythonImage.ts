@@ -54,6 +54,8 @@ let nextId = 1
 const pending = new Map<number, { resolve: (value: ImageData) => void; reject: (error: Error) => void }>()
 /** Scoring returns a JSON report rather than pixels, so it waits separately. */
 const analyses = new Map<number, { resolve: (value: string) => void; reject: (error: Error) => void }>()
+/** The background remover's matte returns pixels *and* a JSON note. */
+const mattes = new Map<number, { resolve: (value: MatteResult) => void; reject: (error: Error) => void }>()
 const listeners = new Set<() => void>()
 
 export function pythonStatus(): { status: PythonStatus; stage: string } {
@@ -84,10 +86,21 @@ function ensureWorker(): Worker {
       if (message.id !== undefined) {
         pending.get(message.id)?.reject(new Error(message.message))
         analyses.get(message.id)?.reject(new Error(message.message))
+        mattes.get(message.id)?.reject(new Error(message.message))
         pending.delete(message.id)
         analyses.delete(message.id)
+        mattes.delete(message.id)
       }
       if (status !== 'ready') announce('failed', message.message)
+      return
+    }
+    if (message.type === 'matte') {
+      mattes.get(message.id)?.resolve({
+        image: new ImageData(new Uint8ClampedArray(message.buffer), message.width, message.height),
+        info: JSON.parse(message.json),
+        millis: message.millis,
+      })
+      mattes.delete(message.id)
       return
     }
     if (message.type === 'report') {
@@ -105,8 +118,10 @@ function ensureWorker(): Worker {
     const failure = new Error('The Python engine could not start')
     pending.forEach((entry) => entry.reject(failure))
     analyses.forEach((entry) => entry.reject(failure))
+    mattes.forEach((entry) => entry.reject(failure))
     pending.clear()
     analyses.clear()
+    mattes.clear()
   }
   return worker
 }
@@ -271,6 +286,56 @@ async function request(type: 'analyze' | 'inspect', image: ImageData, params: An
     ensureWorker().postMessage({ type, id, width: image.width, height: image.height, buffer, params }, [buffer])
   })
   return JSON.parse(json)
+}
+
+// --------------------------------------------------------------- matte ---
+
+export interface MatteInfo {
+  /** The photo is a portrait, so "Person only" is offered. */
+  person?: boolean
+  /** Share of the cut-out lying outside the person — a chair, a desk. */
+  extra?: number
+}
+
+export interface MatteResult {
+  /** RGBA: decontaminated colour and the refined alpha. */
+  image: ImageData
+  info: MatteInfo
+  millis: number
+}
+
+/**
+ * Runs matte.py over a photo (`cutout`) or one brush stroke (`refine`). The
+ * buffers are transferred, so the caller hands over copies it can spare.
+ */
+export function runMatte(
+  mode: 'cutout' | 'refine',
+  image: ImageData,
+  first: Uint8Array,
+  second: Uint8Array | null,
+  options: Record<string, number | boolean>,
+): Promise<MatteResult> {
+  if (status !== 'ready') announce('loading', 'Starting the Python engine')
+  const id = nextId++
+  return new Promise<MatteResult>((resolve, reject) => {
+    mattes.set(id, { resolve, reject })
+    const transfer: Transferable[] = [image.data.buffer, first.buffer]
+    if (second) transfer.push(second.buffer)
+    ensureWorker().postMessage(
+      {
+        type: 'matte',
+        id,
+        mode,
+        width: image.width,
+        height: image.height,
+        buffer: image.data.buffer,
+        first: first.buffer,
+        second: second?.buffer,
+        options,
+      },
+      transfer,
+    )
+  })
 }
 
 /** Rough guide shown before the first download. */

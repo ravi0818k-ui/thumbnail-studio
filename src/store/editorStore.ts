@@ -24,8 +24,9 @@ import { boundingRect } from '../engine/geometry'
 import { DEFAULT_EXPORT, type ExportSettings } from '../engine/export'
 import { DEFAULT_FOCUS, type FocusOptions, type FocusSelection } from '../engine/objectMask'
 import type { TemplateDef } from '../data/templates'
+import { initialScreen } from '../router'
 
-export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals' | 'greenscreen'
+export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals' | 'greenscreen' | 'remover'
 export type GridMode = 'none' | 'grid' | 'thirds' | 'center'
 /**
  * 'clean' hands the stroke to the Python matte pass instead of erasing, and
@@ -46,6 +47,7 @@ export interface EditorState {
   fontsReturnTo: Screen
   fundamentalsReturnTo: Screen
   greenScreenReturnTo: Screen
+  removerReturnTo: Screen
   project: Project
   selection: string[]
   past: Snapshot[]
@@ -88,6 +90,8 @@ export interface EditorState {
   closeFundamentals: () => void
   openGreenScreen: () => void
   closeGreenScreen: () => void
+  openRemover: () => void
+  closeRemover: () => void
   setPanel: (panel: PanelId | null) => void
   newProject: (options?: NewProjectOptions) => void
   setFormat: (format: CanvasFormat) => void
@@ -223,11 +227,13 @@ export const useEditor = create<EditorState>((set, get) => {
   }
 
   return {
-    screen: 'home',
+    // A direct visit to a routed path (/remove-background) opens that screen.
+    screen: initialScreen() ?? 'home',
     colorsReturnTo: 'home',
     fontsReturnTo: 'home',
     fundamentalsReturnTo: 'home',
     greenScreenReturnTo: 'home',
+    removerReturnTo: 'home',
     project: emptyProject(),
     selection: [],
     past: [],
@@ -269,6 +275,8 @@ export const useEditor = create<EditorState>((set, get) => {
     openGreenScreen: () =>
       set((s) => (s.screen === 'greenscreen' ? {} : { screen: 'greenscreen', greenScreenReturnTo: s.screen })),
     closeGreenScreen: () => set((s) => ({ screen: s.greenScreenReturnTo })),
+    openRemover: () => set((s) => (s.screen === 'remover' ? {} : { screen: 'remover', removerReturnTo: s.screen })),
+    closeRemover: () => set((s) => ({ screen: s.removerReturnTo === 'remover' ? 'home' : s.removerReturnTo })),
     setPanel: (panel) => set((s) => ({ panel: s.panel === panel ? null : panel })),
 
     newProject: (options = {}) => {

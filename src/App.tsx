@@ -7,9 +7,12 @@ import FundamentalsScreen from './components/FundamentalsScreen'
 import TemplateScreen from './components/TemplateScreen'
 import GreenScreen from './components/GreenScreen'
 import MobileNotice from './components/MobileNotice'
+import BgRemoverScreen from './components/BgRemoverScreen'
+import { useRouteSync } from './hooks'
 
 export default function App() {
   const screen = useEditor((s) => s.screen)
+  useRouteSync()
   // The green screen is meant to be propped up on a phone or tablet, so it is the one screen that never warns.
   return (
     <>
@@ -27,5 +30,6 @@ function Screen() {
   if (screen === 'fonts') return <FontScreen />
   if (screen === 'fundamentals') return <FundamentalsScreen />
   if (screen === 'greenscreen') return <GreenScreen />
+  if (screen === 'remover') return <BgRemoverScreen />
   return <Editor />
 }

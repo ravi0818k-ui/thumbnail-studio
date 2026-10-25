@@ -3,6 +3,7 @@
 import enhanceSource from '../python/enhance.py?raw'
 import scoreSource from '../python/score.py?raw'
 import visionSource from '../python/vision.py?raw'
+import matteSource from '../python/matte.py?raw'
 
 // ---------------------------------------------------------------------------
 // Python image engine: CPython 3.14 compiled to WebAssembly (Pyodide) running
@@ -55,7 +56,24 @@ export interface PyInspectRequest {
   params: { regions: number[][]; occlusion: Record<string, number[][]> }
 }
 
-export type PyRequest = PyInitRequest | PyRunRequest | PyAnalyzeRequest | PyInspectRequest
+/**
+ * The background remover's matte. `cutout` turns the segmentation masks into
+ * a refined alpha; `refine` re-solves one brush stroke. The image is RGBA and
+ * both masks are one byte per pixel at its size (see matte.run).
+ */
+export interface PyMatteRequest {
+  type: 'matte'
+  id: number
+  mode: 'cutout' | 'refine'
+  width: number
+  height: number
+  buffer: ArrayBuffer
+  first: ArrayBuffer
+  second?: ArrayBuffer
+  options: Record<string, number | boolean>
+}
+
+export type PyRequest = PyInitRequest | PyRunRequest | PyAnalyzeRequest | PyInspectRequest | PyMatteRequest
 
 export interface PyProgress {
   type: 'progress'
@@ -86,7 +104,19 @@ export interface PyReport {
   millis: number
 }
 
-export type PyResponse = PyProgress | PyResult | PyError | PyReport
+export interface PyMatteResult {
+  type: 'matte'
+  id: number
+  width: number
+  height: number
+  /** RGBA: decontaminated colour and the refined alpha. */
+  buffer: ArrayBuffer
+  /** matte.run's info dict, as JSON. */
+  json: string
+  millis: number
+}
+
+export type PyResponse = PyProgress | PyResult | PyError | PyReport | PyMatteResult
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
 
@@ -108,6 +138,7 @@ sys.path.insert(0, ${JSON.stringify(PY_DIR)})
 import enhance
 import score
 import vision
+import matte
 
 _size = [0, 0]
 
@@ -130,6 +161,16 @@ def _analyze(buf, width, height, params_json):
     params = json.loads(params_json)
     report = score.analyze(data, params.get("regions") or [], params.get("occlusion") or {})
     return to_js(json.dumps(report))
+
+def _matte(mode, buf, width, height, first_buf, second_buf, options_json):
+    data = np.frombuffer(buf.to_py(), dtype=np.uint8).reshape(height, width, 4)
+    first = np.frombuffer(first_buf.to_py(), dtype=np.uint8).reshape(height, width)
+    # JsNull, not None, for an absent mask — see _run.
+    second = None
+    if hasattr(second_buf, "to_py"):
+        second = np.frombuffer(second_buf.to_py(), dtype=np.uint8).reshape(height, width)
+    out, info = matte.run(mode, data, first, second, json.loads(options_json))
+    return to_js([np.ascontiguousarray(out).tobytes(), json.dumps(info)])
 
 def _inspect(buf, width, height, params_json):
     data = np.frombuffer(buf.to_py(), dtype=np.uint8).reshape(height, width, 4)
@@ -173,6 +214,7 @@ async function boot(): Promise<Pyodide> {
     instance.FS.writeFile(`${PY_DIR}/enhance.py`, enhanceSource, { encoding: 'utf8' })
     instance.FS.writeFile(`${PY_DIR}/score.py`, scoreSource, { encoding: 'utf8' })
     instance.FS.writeFile(`${PY_DIR}/vision.py`, visionSource, { encoding: 'utf8' })
+    instance.FS.writeFile(`${PY_DIR}/matte.py`, matteSource, { encoding: 'utf8' })
     instance.runPython(BRIDGE)
     pyodide = instance
     report('Python engine ready', true)
@@ -229,6 +271,46 @@ ctx.onmessage = async (event: MessageEvent<PyRequest>) => {
         unwrap(analyze(new Uint8Array(message.buffer), message.width, message.height, JSON.stringify(message.params))),
       )
       ctx.postMessage({ type: 'report', id: message.id, json, millis: Date.now() - started } satisfies PyReport)
+      return
+    }
+    if (message.type === 'matte') {
+      const instance = await boot()
+      const started = Date.now()
+      const run = instance.globals.get('_matte') as (
+        mode: string,
+        buffer: Uint8Array,
+        width: number,
+        height: number,
+        first: Uint8Array,
+        second: Uint8Array | null,
+        options: string,
+      ) => unknown
+      const result = unwrap(
+        run(
+          message.mode,
+          new Uint8Array(message.buffer),
+          message.width,
+          message.height,
+          new Uint8Array(message.first),
+          message.second ? new Uint8Array(message.second) : null,
+          JSON.stringify(message.options),
+        ),
+      ) as [unknown, unknown]
+      const bytes = asBytes(result[0])
+      const out = new Uint8Array(bytes.length)
+      out.set(bytes)
+      ctx.postMessage(
+        {
+          type: 'matte',
+          id: message.id,
+          width: message.width,
+          height: message.height,
+          buffer: out.buffer,
+          json: String(result[1]),
+          millis: Date.now() - started,
+        } satisfies PyMatteResult,
+        [out.buffer],
+      )
       return
     }
     if (message.type !== 'run') return

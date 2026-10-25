@@ -151,6 +151,7 @@ runs on every load. Projects saved by earlier versions are still out there in us
 | Object mask & blur | `engine/runFocus.ts` | same worker, `focus_blur` op | `select_object` grows a scribble into a mask; `focus_blur` softens one side of it. Pure helpers live in `engine/objectMask.ts`, away from the `?worker` import, as with the scorer. |
 | Thumbnail scoring | `engine/runScore.ts` | same worker, `analyze` request | `src/python/score.py` measures the rendered pixels at each platform's width and returns JSON. Shares the runtime with enhancement. |
 | The test report | `engine/runTest.ts` | same worker, `inspect` request | `src/python/vision.py` adds faces, subject/background separation, colour harmony and edge definition. One request returns both it and `score.analyze`, since both read the same frame. |
+| Background remover page | `engine/bgRemover.ts` | `workers/segment.worker.ts`, then the Python worker's `matte` request | BiRefNet-lite + MODNet via `@huggingface/transformers` give low-res masks; `src/python/matte.py` turns them into a full-resolution alpha and edge colour. See "Background remover" below. |
 
 **Python modules are written to Pyodide's filesystem and imported**, not exec'd into globals, so
 `score.py` can `import enhance` exactly as it does under desktop CPython — one environment, one set of
@@ -385,6 +386,58 @@ It has nothing to apply, because its lessons are decisions rather than propertie
 selection-aware header. Entry points match the other guides — `openFundamentals`/`closeFundamentals`
 with `fundamentalsReturnTo`, from the home screen and the editor's view menu.
 
+### Background remover (`/remove-background`)
+
+A standalone page, separate from the editor's own cut-out (which still uses `@imgly/background-removal`).
+It is the `remover` screen, opened from the home screen's **Tools** row; `src/router.ts` gives it a real
+path, `useRouteSync` (in `hooks.ts`) keeps the address bar and the screen in step both ways, and the
+`route-pages` plugin in `vite.config.ts` writes `dist/remove-background/index.html` — a copy of
+`index.html` with the page's own title, description, canonical and social tags — so a direct visit is a
+200 rather than Pages' 404 fallback. Adding a routed page is a row in `ROUTES`.
+
+The pipeline is three steps, all off the main thread:
+
+1. `segment.worker.ts` runs **BiRefNet-lite** (MIT, 115 MB fp16) for the subject and **MODNet** (Apache-2.0,
+   6.6 MB uint8) for "is this a person". BiRefNet runs **only on WebGPU**: its input is fixed at 1024 px and
+   the graph does not fit WebAssembly's 4 GB address space (`std::bad_alloc`). Without a usable GPU the
+   subject model is **ormbg** (Apache-2.0, 44 MB uint8, ISNet architecture) — close on hair, likelier to drop
+   a limb. A GPU can load BiRefNet and still fail to *run* it (a software adapter runs out of storage
+   buffers per shader stage); ONNX Runtime keeps that GPU state for the worker's life, so `segment()` answers
+   with a **fresh, CPU-only worker** and stays on the CPU for the page's later photos. ISNet (what imgly uses) is AGPL and
+   RMBG is non-commercial; the selftest refuses any model whose licence is not MIT or Apache-2.0.
+2. The masks are scaled to photo size on a canvas.
+3. `matte.py` — `run("cutout", …)` — builds a trimap, decides the unsure band **by colour** (each pixel as a
+   mix of the nearby known subject and background colours), smooths it with a colour guided filter, and
+   estimates the true edge colour (blur-fusion) so hair does not carry the old background's tint.
+
+Things that are easy to undo by accident:
+
+- **The two models disagree on purpose, and neither wins silently.** BiRefNet keeps the chair a person sits
+  in; MODNet misses knees and hands. "Whole subject" (BiRefNet) is the default because it never loses a
+  body part; "Person only" lets MODNet's confident core veto everything further than `PERSON_MARGIN` from
+  it, and the page suggests it when `info.extra` (the cut-out's share outside the person) passes
+  `PERSON_HINT_EXTRA`. MODNet's own soft alpha is **never blended in** — at photo size its 512 px fringe
+  is a halo.
+- **`person_is_subject` asks whether the person is inside the cut-out**, not whether the person is most of
+  it: a whole armchair can outweigh the person in it.
+- **Colour sampling widens in steps** (`SAMPLE_WIDEN`, `SAMPLE_STEPS`). Deep inside a mass of curls the
+  nearest pixel the models were sure was background can be far away; without the wider search those gaps
+  keep the model's haze.
+- **Wide means are done on a block-averaged copy** (`wide_mean`) and resampled with Pillow. Full-size
+  cumulative sums and a numpy bilinear gather were what made the first version take ~18 s.
+- **The refine brush sends a crop, not the photo.** `refine_region` must use the *photo's* short side for its
+  radii (`options.side`), and the crop must reach `matte.refine_margin`; `REFINE_MARGIN` in
+  `removerModels.ts` is that margin, and the selftest reads `matte.py`'s constants to check it covers them.
+  A crop solved with its own size as the scale cannot see the known colours and returns 0.5 everywhere —
+  `test_matte.py` pins that a cropped stroke solves like the whole photo.
+
+Editing is `engine/removerEdit.ts`, pure and tested in Node: `original` (the photo) never changes and
+`pixels` (the cut-out) is what the brushes edit, so **Restore always has the true pixels to bring back**
+and must restore colour as well as alpha (the matte's colour where it was background is meaningless).
+History stores only the 64 px tiles a stroke touched, before and after, under a byte budget rather than a
+step count. Crop is a rect applied on export; JPEG output is composited onto a chosen colour because the
+encoder writes transparent pixels as black. Photos are worked at most `MAX_EDGE` (4096) px on the long side.
+
 ### Green screen backdrop
 
 `data/greenScreen.ts` + `components/GreenScreen.tsx` is a utility, not a design: it fills the screen with
@@ -470,3 +523,7 @@ draws no watched bar because the video's own thumbnail paints one. The same chan
   is not fetched at runtime and can be dropped from a deploy.
 - The AI background-removal model and the Pyodide runtime are both CDN-fetched on first use, so the
   offline promise holds only after they are cached (or after `npm run fetch-model` for the model).
+- The remover's models come from the Hugging Face CDN (~122 MB on first use with a GPU, ~51 MB without). `@huggingface/transformers`
+  bundles its own ONNX Runtime, which adds a ~27 MB `ort-wasm-simd-threaded.asyncify` wasm to `dist/`.
+- GitHub Pages cannot send the COOP/COEP headers that multi-threaded WebAssembly needs, so on a machine
+  without WebGPU the remover's fallback model runs on one CPU thread and is slow.

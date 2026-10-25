@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useEditor } from './store/editorStore'
 import { saveProject } from './storage/projects'
+import { HOME_TITLE, normalisePath, pathForScreen, routeForPath, routeForScreen } from './router'
 
 /** Debounced autosave into IndexedDB — projects survive a refresh. */
 export function useAutosave(enabled: boolean) {
@@ -147,4 +148,33 @@ export function useKeyboardShortcuts(onExport: () => void, onSave: () => void) {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onExport, onSave])
+}
+
+/**
+ * Keeps the address bar and the screen in step, both ways. Opening a routed
+ * screen pushes its path, so it can be bookmarked and shared, and Back leaves
+ * it; Back and Forward land on the screen their path names. The tab title
+ * follows, so a history entry reads as the page it is.
+ */
+export function useRouteSync() {
+  const screen = useEditor((s) => s.screen)
+
+  useEffect(() => {
+    const wanted = pathForScreen(screen)
+    if (normalisePath(window.location.pathname) !== wanted) {
+      window.history.pushState(null, '', wanted + window.location.search)
+    }
+    document.title = routeForScreen(screen)?.title ?? HOME_TITLE
+  }, [screen])
+
+  useEffect(() => {
+    const onPop = () => {
+      const route = routeForPath(window.location.pathname)
+      const state = useEditor.getState()
+      if (route?.screen === 'remover' && state.screen !== 'remover') state.openRemover()
+      else if (!route && routeForScreen(state.screen)) state.closeRemover()
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 }

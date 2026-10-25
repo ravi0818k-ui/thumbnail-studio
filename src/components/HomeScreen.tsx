@@ -16,6 +16,7 @@ export default function HomeScreen() {
   const openFontGuide = useEditor((s) => s.openFontGuide)
   const openFundamentals = useEditor((s) => s.openFundamentals)
   const openGreenScreen = useEditor((s) => s.openGreenScreen)
+  const openRemover = useEditor((s) => s.openRemover)
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -104,6 +105,23 @@ export default function HomeScreen() {
                 <span className="muted">Turn this screen into a flat key colour to shoot B-roll against.</span>
               </span>
             </button>
+            {/* A real link, so it can be opened in a new tab or copied; the click stays in the app. */}
+            <a
+              className="format-card"
+              href="/remove-background"
+              onClick={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                event.preventDefault()
+                openRemover()
+              }}
+            >
+              <span className="tool-cutout" aria-hidden />
+              <span>
+                <b>Background remover</b>
+                <em>Hair-accurate · PNG or JPEG</em>
+                <span className="muted">Cut a photo out, fix stray curls with a restore brush, crop and download.</span>
+              </span>
+            </a>
           </div>
 
           <h2 className="h2">Recent projects</h2>

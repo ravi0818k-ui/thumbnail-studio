@@ -2101,6 +2101,221 @@ console.log('brand preset: vivian')
 
 
 // ------------------------------------------------------------- outbound links ---
+console.log('background remover')
+{
+  const { readFileSync } = await import('node:fs')
+  const edit = await import('../src/engine/removerEdit')
+  const models = await import('../src/engine/removerModels')
+  const router = await import('../src/router')
+  const { useEditor } = await import('../src/store/editorStore')
+
+  const W = 120
+  const H = 80
+  const makeMatte = () => {
+    const original = new Uint8ClampedArray(W * H * 4)
+    const pixels = new Uint8ClampedArray(W * H * 4)
+    for (let i = 0; i < W * H; i++) {
+      original.set([200, 100, 50, 255], i * 4)
+      // The cut-out: subject on the left half, background removed on the right,
+      // with a tinted colour where it is transparent (as the matte leaves it).
+      const x = i % W
+      pixels.set(x < W / 2 ? [200, 100, 50, 255] : [9, 9, 9, 0], i * 4)
+    }
+    return { width: W, height: H, original, pixels }
+  }
+  const alphaAt = (m: { pixels: Uint8ClampedArray }, x: number, y: number) => m.pixels[(y * W + x) * 4 + 3]
+
+  // Brush falloff.
+  const hard = { radius: 10, hardness: 1 }
+  const soft = { radius: 10, hardness: 0 }
+  check('a hard brush is full strength to its edge', edit.falloff(9.9, hard) === 1 && edit.falloff(10.1, hard) === 0)
+  check('a soft brush fades from the centre', edit.falloff(0, soft) === 1 && edit.falloff(5, soft) > 0.3 && edit.falloff(5, soft) < 0.7)
+  check('falloff is zero past the radius', edit.falloff(11, soft) === 0)
+  check('falloff never increases outward', [0, 2, 4, 6, 8, 10].every((d, i, a) => i === 0 || edit.falloff(d, { radius: 10, hardness: 0.5 }) <= edit.falloff(a[i - 1], { radius: 10, hardness: 0.5 })))
+  check('the size keys always move a small brush', edit.stepRadius(1, 1) === 2 && edit.stepRadius(2, -1) === 1)
+  check('the size keys stop at the limits', edit.stepRadius(edit.BRUSH_MAX, 1) === edit.BRUSH_MAX && edit.stepRadius(edit.BRUSH_MIN, -1) === edit.BRUSH_MIN)
+
+  // Restore and erase.
+  const matte = makeMatte()
+  const history = new edit.EditHistory(W, H, { tile: 16 })
+  history.begin()
+  const restoreAt = { x: 90, y: 40 }
+  history.touch(matte, edit.segmentBounds(restoreAt, restoreAt, 6, W, H))
+  const dirty = edit.stampSegment(matte, restoreAt, restoreAt, { radius: 6, hardness: 1 }, 'restore')
+  history.commit(matte)
+  check('restore brings back full alpha', alphaAt(matte, 90, 40) === 255)
+  check('restore brings back the photo colour, not the matte tint', matte.pixels[(40 * W + 90) * 4] === 200)
+  check('restore stays inside the brush', alphaAt(matte, 100, 40) === 0)
+  check('the dirty rect covers the dab', !!dirty && dirty.x <= 84 && dirty.x + dirty.width >= 96)
+  history.begin()
+  const eraseFrom = { x: 10, y: 10 }
+  const eraseTo = { x: 40, y: 10 }
+  history.touch(matte, edit.segmentBounds(eraseFrom, eraseTo, 4, W, H))
+  edit.stampSegment(matte, eraseFrom, eraseTo, { radius: 4, hardness: 1 }, 'erase')
+  history.commit(matte)
+  check('erase clears along the whole segment', alphaAt(matte, 10, 10) === 0 && alphaAt(matte, 25, 10) === 0 && alphaAt(matte, 40, 10) === 0)
+  check('erase leaves colour alone', matte.pixels[(10 * W + 25) * 4] === 200)
+  check('erase stays inside the brush', alphaAt(matte, 25, 20) === 255)
+  check('a stroke off the photo touches nothing', edit.stampSegment(matte, { x: -50, y: -50 }, { x: -40, y: -40 }, hard, 'erase') === null)
+
+  // History: tiles, undo, redo, budget.
+  check('two strokes are two steps', history.steps === 2 && history.canUndo && !history.canRedo)
+  history.undo(matte)
+  check('undo puts the erased pixels back', alphaAt(matte, 25, 10) === 255)
+  check('undo does not touch the earlier stroke', alphaAt(matte, 90, 40) === 255)
+  history.redo(matte)
+  check('redo erases again', alphaAt(matte, 25, 10) === 0)
+  history.undo(matte)
+  history.undo(matte)
+  check('undo all returns to the cut-out', alphaAt(matte, 90, 40) === 0 && alphaAt(matte, 25, 10) === 255)
+  check('a new stroke clears redo', (() => {
+    history.begin()
+    history.touch(matte, { x: 0, y: 0, width: 4, height: 4 })
+    edit.stampSegment(matte, { x: 2, y: 2 }, { x: 2, y: 2 }, { radius: 2, hardness: 1 }, 'erase')
+    history.commit(matte)
+    return !history.canRedo
+  })())
+  check('an untouched step records nothing', (() => {
+    const before = history.steps
+    history.begin()
+    return history.commit(matte) === false && history.steps === before
+  })())
+  check('cancel restores an open step', (() => {
+    history.begin()
+    history.touch(matte, { x: 60, y: 60, width: 10, height: 10 })
+    edit.stampSegment(matte, { x: 65, y: 65 }, { x: 65, y: 65 }, { radius: 3, hardness: 1 }, 'restore')
+    history.cancel(matte)
+    return alphaAt(matte, 65, 65) === 0
+  })())
+  check('a dab stores only the tiles it touched', (() => {
+    const h = new edit.EditHistory(W, H, { tile: 16 })
+    const m = makeMatte()
+    h.begin()
+    h.touch(m, { x: 0, y: 0, width: 4, height: 4 })
+    h.commit(m)
+    // One 16 × 16 tile, before and after, RGBA.
+    return (h as unknown as { past: { bytes: number }[] }).past[0].bytes === 16 * 16 * 4 * 2
+  })())
+  check('the byte budget drops the oldest steps', (() => {
+    const h = new edit.EditHistory(W, H, { tile: 16, budget: 16 * 16 * 4 * 2 * 3 })
+    const m = makeMatte()
+    for (let i = 0; i < 6; i++) {
+      h.begin()
+      h.touch(m, { x: i * 16, y: 0, width: 4, height: 4 })
+      h.commit(m)
+    }
+    return h.steps === 3
+  })())
+
+  // Refine coverage and blending.
+  const coverage = new Uint8Array(W * H)
+  // Centred on a pixel centre, so the soft brush reaches full strength there.
+  const dab = { x: 30.5, y: 30.5 }
+  edit.stampCoverage(coverage, W, H, dab, dab, { radius: 5, hardness: 0 })
+  edit.stampCoverage(coverage, W, H, dab, dab, { radius: 5, hardness: 0 })
+  check('coverage is the max of the brush, not a sum', coverage[30 * W + 30] === 255 && coverage[30 * W + 33] < 255)
+  const blended = makeMatte()
+  const rect = { x: 20, y: 20, width: 20, height: 20 }
+  const solved = new Uint8ClampedArray(rect.width * rect.height * 4).fill(7)
+  edit.blendRefine(blended, rect, solved, coverage)
+  check('refine writes inside the stroke', blended.pixels[(30 * W + 30) * 4 + 3] === 7)
+  check('refine never writes outside the stroke', blended.pixels[(21 * W + 21) * 4 + 3] === 255)
+
+  // Crop.
+  const bounds = edit.fullRect(W, H)
+  const sq = edit.fitAspect(bounds, 1, bounds)
+  check('a square crop of a landscape photo is full height', sq.width === H && sq.height === H && sq.x === (W - H) / 2)
+  const standing = { x: 40, y: 0, width: 40, height: 80 }
+  const headroom = edit.fitAspect(standing, 1, bounds, true)
+  check('fitting a tall subject to a square keeps its top', headroom.y === 0 && headroom.height === 80 && headroom.width === 80)
+  const tallInSquare = edit.fitAspect({ x: 50, y: 0, width: 20, height: 80 }, 0.25, bounds, true)
+  check('keeping the top changes nothing when nothing is cut', tallInSquare.y === 0 && tallInSquare.height === 80)
+  const croppedTop = edit.fitAspect({ x: 0, y: 10, width: 120, height: 70 }, 4, bounds, true)
+  check('a forced cut comes off the bottom', croppedTop.y === 10 && croppedTop.height < 70)
+  const wide = edit.fitAspect(bounds, 16 / 9, bounds)
+  check('a ratio crop keeps the ratio', Math.abs(wide.width / wide.height - 16 / 9) < 0.03)
+  check('a ratio crop stays inside the photo', wide.x >= 0 && wide.y >= 0 && wide.x + wide.width <= W && wide.y + wide.height <= H)
+  const moved = edit.dragCrop({ x: 10, y: 10, width: 40, height: 30 }, 'move', 500, 500, null, bounds)
+  check('moving a crop stops at the edge', moved.x + moved.width === W && moved.y + moved.height === H && moved.width === 40)
+  const grown = edit.dragCrop({ x: 10, y: 10, width: 40, height: 30 }, 'se', 1000, 1000, null, bounds)
+  check('a free handle stops at the photo', grown.x + grown.width === W && grown.y + grown.height === H)
+  const shrunk = edit.dragCrop({ x: 10, y: 10, width: 40, height: 30 }, 'se', -1000, -1000, null, bounds)
+  check('a crop cannot collapse', shrunk.width === edit.CROP_MIN && shrunk.height === edit.CROP_MIN)
+  const ratioDrag = edit.dragCrop({ x: 10, y: 10, width: 40, height: 40 }, 'se', 20, 2, 1, bounds)
+  check('a ratio handle keeps the ratio', ratioDrag.width === ratioDrag.height && ratioDrag.x === 10 && ratioDrag.y === 10)
+  const ratioEdge = edit.dragCrop({ x: 10, y: 10, width: 40, height: 40 }, 'e', 500, 0, 1, bounds)
+  check('a ratio crop never leaves the photo', ratioEdge.x + ratioEdge.width <= W && ratioEdge.y + ratioEdge.height <= H)
+  check('the subject is found', JSON.stringify(edit.subjectBounds(makeMatte().pixels, W, H)) === JSON.stringify({ x: 0, y: 0, width: W / 2, height: H }))
+  check('an empty cut-out has no subject', edit.subjectBounds(new Uint8ClampedArray(W * H * 4), W, H) === null)
+  const trimmed = edit.trimToSubject(makeMatte().pixels, W, H, 0.1)!
+  check('trimming leaves a margin but stays in the photo', trimmed.width === W / 2 + 8 && trimmed.x === 0)
+  check('every aspect preset resolves', edit.ASPECTS.every((a) => a.ratio === null || (edit.resolveRatio(a, W, H) ?? 0) > 0))
+  check('aspect ids are unique', new Set(edit.ASPECTS.map((a) => a.id)).size === edit.ASPECTS.length)
+
+  // Export.
+  const exported = makeMatte()
+  const png = edit.renderOutput(exported, { x: 50, y: 0, width: 20, height: 10 }, 'png')
+  check('PNG keeps transparency', png.data[3] === 255 && png.data[(19) * 4 + 3] === 0)
+  check('the export is the crop', png.width === 20 && png.height === 10 && png.data.length === 20 * 10 * 4)
+  const jpeg = edit.renderOutput(exported, { x: 50, y: 0, width: 20, height: 10 }, 'jpeg', '#00ff00')
+  check('JPEG is opaque everywhere', (() => {
+    for (let i = 3; i < jpeg.data.length; i += 4) if (jpeg.data[i] !== 255) return false
+    return true
+  })())
+  check('JPEG puts transparency on the chosen colour', jpeg.data[19 * 4] === 0 && jpeg.data[19 * 4 + 1] === 255)
+  check('JPEG keeps the subject', jpeg.data[0] === 200)
+  check('export does not change the cut-out', exported.pixels[3] === 255 && exported.pixels[(W - 1) * 4 + 3] === 0)
+  check('a bad colour falls back to white', JSON.stringify(edit.parseHex('nope')) === '[255,255,255]')
+  check('the file is named after the photo', edit.outputName('My Photo.JPG', 'png') === 'my-photo-no-background.png')
+  check('a JPEG gets the .jpg extension', edit.outputName('a.png', 'jpeg') === 'a-no-background.jpg')
+  check('an unusable name still gives a file', edit.outputName('???', 'png') === 'photo-no-background.png')
+  check('big photos are scaled to the working edge', (() => {
+    const s2 = edit.workingSize(8000, 6000)
+    return s2.width === edit.MAX_EDGE && s2.height === 3072 && s2.scale < 1
+  })())
+  check('small photos are left alone', edit.workingSize(1200, 800).scale === 1)
+
+  // The page's crop around a refine stroke must cover what matte.py reads.
+  const matteSource = readFileSync('src/python/matte.py', 'utf8')
+  const constant = (name: string) => Number(new RegExp(`^${name} = ([0-9.]+)`, 'm').exec(matteSource)?.[1])
+  const needed = constant('SAMPLE_REACH') * constant('SAMPLE_WIDEN') + constant('BAND')
+  check('python constants were read', Number.isFinite(needed) && needed > 0, String(needed))
+  check('the refine crop covers matte.refine_margin', models.REFINE_MARGIN >= needed, `${models.REFINE_MARGIN} < ${needed}`)
+  check('model facts are complete', models.REMOVER_MODELS.every((m) => m.repo.includes('/') && m.megabytes > 0 && m.licence.length > 0))
+  check('the first download counts one subject model, not both', models.downloadMegabytes(true) === 115 + 7 && models.downloadMegabytes(false) === 44 + 7)
+  check('no model with a non-commercial licence ships', models.REMOVER_MODELS.every((m) => /^(MIT|Apache-2\.0)$/.test(m.licence)))
+  check('the worker loads the models the page describes', (() => {
+    const worker = readFileSync('src/workers/segment.worker.ts', 'utf8')
+    return models.REMOVER_MODELS.every((m) => worker.includes(`'${m.repo}'`))
+  })())
+
+  // Routing.
+  check('the remover has a path', router.pathForScreen('remover') === '/remove-background')
+  check('every other screen lives at /', router.pathForScreen('home') === '/' && router.pathForScreen('editor') === '/')
+  check('a trailing slash is the same page', router.routeForPath('/remove-background/')?.screen === 'remover')
+  check('an unknown path is no route', router.routeForPath('/nope') === null && router.routeForPath('/') === null)
+  check('routes are unique', new Set(router.ROUTES.map((r) => r.path)).size === router.ROUTES.length)
+  const indexHtml = readFileSync('index.html', 'utf8')
+  check('HOME_TITLE matches index.html', indexHtml.includes(`<title>${router.HOME_TITLE}</title>`))
+  const routed = router.htmlForRoute(indexHtml, router.ROUTES[0])
+  const escaped = router.ROUTES[0].description.replace(/&/g, '&amp;')
+  check('the route page has its own title', routed.includes(`<title>${router.ROUTES[0].title}</title>`))
+  check('the route page has its own canonical', routed.includes('href="https://youtubethumbnail.org/remove-background"'))
+  check('description, og and twitter all describe the route', routed.split(escaped).length - 1 === 3, String(routed.split(escaped).length - 1))
+  check('og:url points at the route', routed.includes('content="https://youtubethumbnail.org/remove-background"'))
+  check('the home page is untouched', !indexHtml.includes('remove-background'))
+  check('the sitemap lists the route', readFileSync('public/sitemap.xml', 'utf8').includes('https://youtubethumbnail.org/remove-background'))
+
+  const state = useEditor.getState()
+  state.setScreen('home')
+  state.openRemover()
+  check('opening the remover remembers where from', useEditor.getState().screen === 'remover' && useEditor.getState().removerReturnTo === 'home')
+  useEditor.getState().openRemover()
+  check('opening it twice keeps the way back', useEditor.getState().removerReturnTo === 'home')
+  useEditor.getState().closeRemover()
+  check('closing returns there', useEditor.getState().screen === 'home')
+}
+
 console.log('outbound links')
 {
   const links = await import('../src/data/links')
