@@ -2306,6 +2306,103 @@ console.log('background remover')
   check('the home page is untouched', !indexHtml.includes('remove-background'))
   check('the sitemap lists the route', readFileSync('public/sitemap.xml', 'utf8').includes('https://youtubethumbnail.org/remove-background'))
 
+  // --- tutorials ----------------------------------------------------------
+  console.log('tutorials')
+  const tutorials = await import('../src/data/tutorials')
+  const links = await import('../src/data/links')
+  const { TEMPLATES } = await import('../src/data/templates')
+  const sitemap = readFileSync('public/sitemap.xml', 'utf8')
+  check('the tutorials have a path', router.pathForScreen('tutorials') === '/tutorials')
+  check('every route is in the sitemap', router.ROUTES.every((r) => sitemap.includes(`<loc>${router.canonicalUrl(r)}</loc>`)))
+  check('every routed screen has a case in App', router.ROUTES.every((r) => readFileSync('src/App.tsx', 'utf8').includes(`screen === '${r.screen}'`)))
+  check('every routed screen is handled on browser back', router.ROUTES.every((r) => readFileSync('src/hooks.ts', 'utf8').includes(`${r.screen}: {`)))
+  // The home card and the list must name the same walkthrough.
+  check('the first lesson is the home walkthrough', tutorials.TUTORIALS[0].id === links.TUTORIAL_VIDEO_ID && tutorials.TUTORIALS[0].duration === links.TUTORIAL_DURATION)
+  check('lesson ids are YouTube ids', tutorials.TUTORIALS.every((t) => /^[\w-]{11}$/.test(t.id)))
+  check('lesson ids are unique', new Set(tutorials.TUTORIALS.map((t) => t.id)).size === tutorials.TUTORIALS.length)
+  check('durations read like YouTube', tutorials.TUTORIALS.every((t) => /^\d{1,2}:[0-5]\d$/.test(t.duration)))
+  check('every lesson has three things to learn', tutorials.TUTORIALS.every((t) => t.learn.length === 3 && t.learn.every((l) => l.title && l.text)))
+  check('every lesson has a call to action', tutorials.TUTORIALS.every((t) => t.cta.length > 0 && t.ctaNote.length > 0))
+  // tryIt switches on the action; one it has no branch for would land on the watched bar.
+  const screenSource = readFileSync('src/components/TutorialsScreen.tsx', 'utf8')
+  check('every action has a branch in tryIt', tutorials.TUTORIALS.every((t) => t.action === 'watched-bar' || screenSource.includes(`action === '${t.action}'`)))
+  check('the demo template exists', TEMPLATES.some((t) => t.id === tutorials.TRY_TEMPLATE_ID && (t.format ?? 'thumbnail') === 'thumbnail'))
+  check('a lesson link round-trips', tutorials.tutorialById(new URLSearchParams(tutorials.lessonPath('orR6_EoT-Nc').split('?')[1]).get('v'))?.id === 'orR6_EoT-Nc')
+  check('an unknown lesson is none', tutorials.tutorialById('nope') === null && tutorials.tutorialById(null) === null)
+
+  // --- thumbnail downloader ----------------------------------------------
+  console.log('thumbnail downloader')
+  const yt = await import('../src/engine/ytThumbnail')
+  check('the downloader has a path', router.pathForScreen('grabber') === '/youtube-thumbnail-downloader')
+  const ID = 'orR6_EoT-Nc'
+  const forms = [
+    ID,
+    `  ${ID}  `,
+    `https://www.youtube.com/watch?v=${ID}`,
+    `https://youtube.com/watch?v=${ID}&t=42s&list=PL123`,
+    `https://www.youtube.com/watch?feature=share&v=${ID}`,
+    `https://m.youtube.com/watch?v=${ID}`,
+    `https://music.youtube.com/watch?v=${ID}`,
+    `https://youtu.be/${ID}`,
+    `https://youtu.be/${ID}?si=8DhNhSorTxPvTRBU`,
+    `youtu.be/${ID}`,
+    `www.youtube.com/watch?v=${ID}`,
+    `https://www.youtube.com/shorts/${ID}`,
+    `https://youtube.com/shorts/${ID}?feature=share`,
+    `https://www.youtube.com/embed/${ID}?start=10`,
+    `https://www.youtube-nocookie.com/embed/${ID}`,
+    `https://www.youtube.com/live/${ID}`,
+    `https://www.youtube.com/v/${ID}`,
+    `https://WWW.YOUTUBE.COM/watch?v=${ID}`,
+    `https://www.youtube.com/attribution_link?u=/watch%3Fv%3D${ID}%26feature%3Dshare`,
+  ]
+  for (const f of forms) check(`parses ${f.trim().slice(0, 60)}`, yt.parseVideoId(f) === ID, String(yt.parseVideoId(f)))
+  const junk = [
+    '',
+    'hello world',
+    'https://vimeo.com/123456789',
+    `https://notyoutube.com/watch?v=${ID}`,
+    `https://youtube.com.evil.io/watch?v=${ID}`,
+    'https://www.youtube.com/@youtubethumbnail_org',
+    'https://www.youtube.com/watch?v=short',
+    'https://www.youtube.com/playlist?list=PL123',
+    `${ID}x`,
+  ]
+  for (const j of junk) check(`refuses ${j || '(empty)'}`, yt.parseVideoId(j) === null, String(yt.parseVideoId(j)))
+  check('sizes run largest first', yt.THUMB_SIZES.every((s, i, all) => i === 0 || all[i - 1].width > s.width))
+  check('maxres is full HD', yt.THUMB_SIZES[0].id === 'maxresdefault' && yt.THUMB_SIZES[0].width === 1280)
+  check('a still is served from i.ytimg.com', yt.thumbnailUrl(ID, 'hqdefault') === `https://i.ytimg.com/vi/${ID}/hqdefault.jpg`)
+  check('the file is named from the title', yt.downloadName('Preview Your Thumbnail: Score & Mobile!', ID, 'maxresdefault', 'png') === 'preview-your-thumbnail-score-mobile-thumbnail-maxresdefault.png')
+  check('accents are folded', yt.downloadName('Café Déjà vu', ID, 'hqdefault', 'jpg') === 'cafe-deja-vu-thumbnail-hqdefault.jpg')
+  check('no title falls back to the id', yt.downloadName(null, ID, 'sddefault', 'png') === `${ID}-thumbnail-sddefault.png` && yt.downloadName('！！！', ID, 'sddefault', 'png') === `${ID}-thumbnail-sddefault.png`)
+  check('long titles are cut', yt.downloadName('a'.repeat(200), ID, 'default', 'png').length < 90)
+
+  // A 16:9 picture in a 4:3 frame: 45 px bars on a 480 × 360 still.
+  const frame = (w: number, h: number, paint: (x: number, y: number) => number) => {
+    const d = new Uint8ClampedArray(w * h * 4)
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const v = paint(x, y)
+      const i = (y * w + x) * 4
+      d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255
+    }
+    return d
+  }
+  const boxed = frame(48, 36, (x, y) => (y < 5 || y >= 31 ? 6 : 60 + ((x * 7 + y * 3) % 150)))
+  const lb = yt.letterbox(boxed, 48, 36)
+  // 5 px bars leave 26 rows; 16:9 of 48 is 27, so the snap takes the bars to 4 and 5.
+  check('letterbox bars are found', lb.top === 4 && lb.bottom === 5, JSON.stringify(lb))
+  // Uneven JPEG edges (bars of 44 and 46) still come out exactly 16:9.
+  const uneven = yt.letterbox(frame(480, 360, (x, y) => (y < 44 || y >= 314 ? 6 : 60 + ((x + y) % 150))), 480, 360)
+  check('a near-16:9 picture snaps to exactly 16:9', 360 - uneven.top - uneven.bottom === 270, JSON.stringify(uneven))
+  check('a full-bleed still has no bars', JSON.stringify(yt.letterbox(frame(48, 36, (x) => 60 + x), 48, 36)) === '{"top":0,"bottom":0}')
+  const darkTop = frame(48, 36, (x, y) => (y < 8 ? 5 : 100 + x))
+  check('one dark band is not letterboxing', JSON.stringify(yt.letterbox(darkTop, 48, 36)) === '{"top":0,"bottom":0}')
+  const allBlack = frame(48, 36, () => 0)
+  check('an all-black still is not trimmed', JSON.stringify(yt.letterbox(allBlack, 48, 36)) === '{"top":0,"bottom":0}')
+  // A bright detail in an otherwise dark row means picture, not bar.
+  const starry = frame(48, 36, (x, y) => (y < 5 || y >= 31 ? (x === 20 ? 255 : 4) : 120))
+  check('a dark row with a bright detail is picture', JSON.stringify(yt.letterbox(starry, 48, 36)) === '{"top":0,"bottom":0}')
+
   const state = useEditor.getState()
   state.setScreen('home')
   state.openRemover()

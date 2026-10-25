@@ -2,8 +2,9 @@ import type { Screen } from './store/editorStore'
 
 // ---------------------------------------------------------------------------
 // The app has no router: screens are store state. A screen that people link
-// to, or arrive at from a search, gets a real path here instead — today only
-// the background remover. Every other screen lives at "/".
+// to, or arrive at from a search, gets a real path here instead — the
+// background remover, the thumbnail downloader and the tutorials. Every other
+// screen lives at "/".
 //
 // The build writes a copy of index.html at each path (vite.config.ts) so a
 // direct visit is a 200, not GitHub Pages' 404 fallback, and carries that
@@ -24,6 +25,20 @@ export const ROUTES: Route[] = [
     title: 'Free Background Remover — Hair-Accurate, In Your Browser | Thumbnail Studio',
     description:
       'Remove the background from any photo for free. Hair-accurate cut-outs, a restore brush for curls, crop, and PNG or JPEG download — it all runs in your browser and nothing is uploaded.',
+  },
+  {
+    screen: 'grabber',
+    path: '/youtube-thumbnail-downloader',
+    title: 'YouTube Thumbnail Downloader — Save Any Thumbnail as PNG in HD | Thumbnail Studio',
+    description:
+      'Paste a YouTube link and download that video’s thumbnail in full HD (1280×720) or any smaller size, as a PNG. Works with Shorts and youtu.be links, trims the black bars, and runs in your browser.',
+  },
+  {
+    screen: 'tutorials',
+    path: '/tutorials',
+    title: 'YouTube Thumbnail Tutorials — Short Video Lessons | Thumbnail Studio',
+    description:
+      'Short video lessons for Thumbnail Studio: your first thumbnail in 7 minutes, previewing it in dark mode, light mode and on mobile, adding icons, and painting a watched bar. Every lesson opens the feature it teaches.',
   },
 ]
 

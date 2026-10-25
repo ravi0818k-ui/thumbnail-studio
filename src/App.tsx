@@ -8,16 +8,19 @@ import TemplateScreen from './components/TemplateScreen'
 import GreenScreen from './components/GreenScreen'
 import MobileNotice from './components/MobileNotice'
 import BgRemoverScreen from './components/BgRemoverScreen'
+import TutorialsScreen from './components/TutorialsScreen'
+import ThumbnailGrabberScreen from './components/ThumbnailGrabberScreen'
 import { useRouteSync } from './hooks'
 
 export default function App() {
   const screen = useEditor((s) => s.screen)
   useRouteSync()
-  // The green screen is meant to be propped up on a phone or tablet, so it is the one screen that never warns.
+  // The green screen is meant to be propped up on a phone or tablet, and the tutorials and the downloader
+  // are a single column, so none of them warns.
   return (
     <>
       <Screen />
-      {screen !== 'greenscreen' && <MobileNotice />}
+      {screen !== 'greenscreen' && screen !== 'tutorials' && screen !== 'grabber' && <MobileNotice />}
     </>
   )
 }
@@ -31,5 +34,7 @@ function Screen() {
   if (screen === 'fundamentals') return <FundamentalsScreen />
   if (screen === 'greenscreen') return <GreenScreen />
   if (screen === 'remover') return <BgRemoverScreen />
+  if (screen === 'tutorials') return <TutorialsScreen />
+  if (screen === 'grabber') return <ThumbnailGrabberScreen />
   return <Editor />
 }

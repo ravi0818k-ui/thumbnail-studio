@@ -26,7 +26,7 @@ import { DEFAULT_FOCUS, type FocusOptions, type FocusSelection } from '../engine
 import type { TemplateDef } from '../data/templates'
 import { initialScreen } from '../router'
 
-export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals' | 'greenscreen' | 'remover'
+export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals' | 'greenscreen' | 'remover' | 'tutorials' | 'grabber'
 export type GridMode = 'none' | 'grid' | 'thirds' | 'center'
 /**
  * 'clean' hands the stroke to the Python matte pass instead of erasing, and
@@ -48,6 +48,8 @@ export interface EditorState {
   fundamentalsReturnTo: Screen
   greenScreenReturnTo: Screen
   removerReturnTo: Screen
+  tutorialsReturnTo: Screen
+  grabberReturnTo: Screen
   project: Project
   selection: string[]
   past: Snapshot[]
@@ -92,6 +94,10 @@ export interface EditorState {
   closeGreenScreen: () => void
   openRemover: () => void
   closeRemover: () => void
+  openTutorials: () => void
+  closeTutorials: () => void
+  openGrabber: () => void
+  closeGrabber: () => void
   setPanel: (panel: PanelId | null) => void
   newProject: (options?: NewProjectOptions) => void
   setFormat: (format: CanvasFormat) => void
@@ -234,6 +240,8 @@ export const useEditor = create<EditorState>((set, get) => {
     fundamentalsReturnTo: 'home',
     greenScreenReturnTo: 'home',
     removerReturnTo: 'home',
+    tutorialsReturnTo: 'home',
+    grabberReturnTo: 'home',
     project: emptyProject(),
     selection: [],
     past: [],
@@ -277,6 +285,11 @@ export const useEditor = create<EditorState>((set, get) => {
     closeGreenScreen: () => set((s) => ({ screen: s.greenScreenReturnTo })),
     openRemover: () => set((s) => (s.screen === 'remover' ? {} : { screen: 'remover', removerReturnTo: s.screen })),
     closeRemover: () => set((s) => ({ screen: s.removerReturnTo === 'remover' ? 'home' : s.removerReturnTo })),
+    openTutorials: () =>
+      set((s) => (s.screen === 'tutorials' ? {} : { screen: 'tutorials', tutorialsReturnTo: s.screen })),
+    closeTutorials: () => set((s) => ({ screen: s.tutorialsReturnTo === 'tutorials' ? 'home' : s.tutorialsReturnTo })),
+    openGrabber: () => set((s) => (s.screen === 'grabber' ? {} : { screen: 'grabber', grabberReturnTo: s.screen })),
+    closeGrabber: () => set((s) => ({ screen: s.grabberReturnTo === 'grabber' ? 'home' : s.grabberReturnTo })),
     setPanel: (panel) => set((s) => ({ panel: s.panel === panel ? null : panel })),
 
     newProject: (options = {}) => {

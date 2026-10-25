@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useEditor } from './store/editorStore'
+import { useEditor, type Screen } from './store/editorStore'
 import { saveProject } from './storage/projects'
 import { HOME_TITLE, normalisePath, pathForScreen, routeForPath, routeForScreen } from './router'
 
@@ -171,8 +171,14 @@ export function useRouteSync() {
     const onPop = () => {
       const route = routeForPath(window.location.pathname)
       const state = useEditor.getState()
-      if (route?.screen === 'remover' && state.screen !== 'remover') state.openRemover()
-      else if (!route && routeForScreen(state.screen)) state.closeRemover()
+      // Each routed screen's own open/close, so it remembers where to go back to.
+      const routed: Partial<Record<Screen, { open: () => void; close: () => void }>> = {
+        remover: { open: state.openRemover, close: state.closeRemover },
+        tutorials: { open: state.openTutorials, close: state.closeTutorials },
+        grabber: { open: state.openGrabber, close: state.closeGrabber },
+      }
+      if (route && route.screen !== state.screen) routed[route.screen]?.open()
+      else if (!route) routed[state.screen]?.close()
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)

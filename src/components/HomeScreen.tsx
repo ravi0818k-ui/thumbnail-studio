@@ -17,6 +17,7 @@ export default function HomeScreen() {
   const openFundamentals = useEditor((s) => s.openFundamentals)
   const openGreenScreen = useEditor((s) => s.openGreenScreen)
   const openRemover = useEditor((s) => s.openRemover)
+  const openGrabber = useEditor((s) => s.openGrabber)
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -120,6 +121,22 @@ export default function HomeScreen() {
                 <b>Background remover</b>
                 <em>Hair-accurate · PNG or JPEG</em>
                 <span className="muted">Cut a photo out, fix stray curls with a restore brush, crop and download.</span>
+              </span>
+            </a>
+            <a
+              className="format-card"
+              href="/youtube-thumbnail-downloader"
+              onClick={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                event.preventDefault()
+                openGrabber()
+              }}
+            >
+              <span className="tool-grab" aria-hidden />
+              <span>
+                <b>Thumbnail downloader</b>
+                <em>Any video · up to 1280 × 720 · PNG</em>
+                <span className="muted">Paste a YouTube link to save that video's thumbnail.</span>
               </span>
             </a>
           </div>

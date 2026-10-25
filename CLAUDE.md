@@ -438,6 +438,38 @@ History stores only the 64 px tiles a stroke touched, before and after, under a 
 step count. Crop is a rect applied on export; JPEG output is composited onto a chosen colour because the
 encoder writes transparent pixels as black. Photos are worked at most `MAX_EDGE` (4096) px on the long side.
 
+### Tutorials (`/tutorials`)
+
+`data/tutorials.ts` is the channel's lessons; `TutorialsScreen` renders them as a YouTube watch page (player,
+lesson, "Up next") and holds no list of its own, so a new video is a row. The home `TutorialCard` is
+unchanged apart from an "Explore more videos" link, and the first lesson **is** its walkthrough — read from
+`links.ts`, and the card's three steps are that lesson's `learn`, so the two cannot drift.
+
+- **Every lesson opens the feature it teaches.** `action` drives `tryIt()`; the demos call `newProject` before
+  applying `TRY_TEMPLATE_ID`, so "Try it now" never overwrites the creator's current design. The selftest
+  checks every action has a branch and the template exists.
+- `?v=<id>` names the lesson, so one video can be linked from a description. The screen writes it only while
+  the path is `/tutorials` and strips it on unmount, or the home page would inherit it.
+- Players are facades on youtube-nocookie, as on the home card. "Played" ticks are `localStorage` only and mean
+  *started* — the page cannot see how much was watched without loading YouTube's iframe API.
+
+### Thumbnail downloader (`/youtube-thumbnail-downloader`)
+
+Paste a YouTube link, get that video's thumbnail, save it as PNG. `engine/ytThumbnail.ts` holds all of it;
+the top half is pure and selftested, `ThumbnailGrabberScreen` is the page. No server and no API key:
+
+- **i.ytimg.com and oEmbed both allow cross-origin reads** (`Access-Control-Allow-Origin`), so the page
+  fetches every size in `THUMB_SIZES` in parallel, decodes it and re-encodes PNG on a canvas. A size the
+  video lacks is a **404** (maxres exists only for HD uploads) and is shown disabled; no size at all means a
+  private, deleted or mistyped video. oEmbed only supplies the title and channel — a failure there is fine.
+- **`parseVideoId` takes anything a creator pastes** — watch, youtu.be, Shorts, embed, live, `/v/`, mobile,
+  Music, nocookie, attribution links, no scheme, the bare id — and refuses lookalike hosts
+  (`youtube.com.evil.io`). The selftest lists every form; add one there when adding it here.
+- **`letterbox` trims the 4:3 sizes' black bars** only when *both* are present and about equal, so a dark sky
+  is not cropped, rows with any bright detail are picture, and a near-16:9 result snaps to exactly 16:9
+  (JPEG smears the edge row, which otherwise gives 480 × 271).
+- Pasting a valid link looks it up at once; the page says thumbnails belong to their creators.
+
 ### Green screen backdrop
 
 `data/greenScreen.ts` + `components/GreenScreen.tsx` is a utility, not a design: it fills the screen with

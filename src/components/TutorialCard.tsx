@@ -1,11 +1,10 @@
 import { useState } from 'react'
+import { useEditor } from '../store/editorStore'
 import { TUTORIAL_DURATION, TUTORIAL_VIDEO_ID, TUTORIAL_VIDEO_URL, YOUTUBE_SUBSCRIBE_URL } from '../data/links'
+import { TUTORIALS } from '../data/tutorials'
 
-const STEPS = [
-  { n: '01', title: 'Cut yourself out', text: 'One click removes the photo background.' },
-  { n: '02', title: 'Make it pop', text: 'Big text, outline and glow that read on a phone.' },
-  { n: '03', title: 'Preview like YouTube', text: 'See it in the feed before you upload.' },
-]
+// The walkthrough is the first lesson on /tutorials too; its steps live there.
+const STEPS = TUTORIALS[0].learn.map((step, i) => ({ n: String(i + 1).padStart(2, '0'), ...step }))
 
 /**
  * The getting-started video, dressed as the thing it teaches: a YouTube card
@@ -18,6 +17,7 @@ const STEPS = [
  */
 export default function TutorialCard() {
   const [playing, setPlaying] = useState(false)
+  const openTutorials = useEditor((s) => s.openTutorials)
 
   return (
     <section className="tutorial" aria-label="Video tutorial">
@@ -84,6 +84,18 @@ export default function TutorialCard() {
             Subscribe for more
           </a>
         </div>
+        {/* A real link, so it can be opened in a new tab or copied; the click stays in the app. */}
+        <a
+          className="tutorial-more"
+          href="/tutorials"
+          onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+            event.preventDefault()
+            openTutorials()
+          }}
+        >
+          {TUTORIALS.length - 1} more short lessons · <b>Explore more videos →</b>
+        </a>
       </div>
     </section>
   )
