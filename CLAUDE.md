@@ -29,12 +29,13 @@ there surfaces only when the script runs.
 React + TypeScript + Vite + Zustand. No backend: editing, background removal, image enhancement,
 project storage and export all happen in the browser.
 
-### One engine, three products
+### One engine, four products
 
 `src/data/formats.ts` is the **only** place the horizontal thumbnail (1280×720), the vertical Shorts
-cover (1080×1920) and the channel banner (2560×1440) differ — canvas size and presets, safe-zone insets,
-left-toolbar order, export copy, starting background, whether the canvas can be resized and whether the
-thumbnail scorer applies (`scored`). Everything else is shared. Add a format by adding an entry there,
+cover (1080×1920), the channel banner (2560×1440) and the LinkedIn post (1080×1350) differ — canvas size
+and presets, safe-zone insets, left-toolbar order, export copy, starting background, whether the canvas
+can be resized, whether orientation switches format (`sizeDecidesFormat`), the composition check's
+headline floor and word budget, and whether the thumbnail scorer applies (`scored`). Everything else is shared. Add a format by adding an entry there,
 not by branching in components.
 
 **The banner is cropped, not covered**, so it carries `guides` (TV, desktop, tablet, mobile — YouTube's
@@ -91,6 +92,15 @@ applied to the content **before** effects, so effects follow the feathered shape
 selftest pins down: `maskPadding` grows the raster only for a `subject` mask, because a drawn region is
 clamped inside the layer box; and `maskInset` keeps a drawn region's whole falloff inside that box, since
 a fade centred on the edge would be clipped in half and read as a hard line.
+
+**Coloured words are character ranges, not markup.** `TextObject.accents` (`{start, end, color}`, offsets
+into `text`) colours a phrase inside one wrapping layer. `engine/textAccents.ts` is pure and selftested:
+`cleanAccents` keeps runs sorted, trimmed and merged across spaces; `remapAccents` keeps them on their
+words as the text is edited, and **`store.updateObject` calls it on every `text` patch** that does not set
+`accents` itself — so the canvas editor, the panel textarea and anything else that retypes text get it for
+free. `layoutText` records each line's start offset and `displayMap` maps uppercased characters back to
+the source (ß → SS). Text with no accents keeps the old single-call drawing path, so existing designs
+render byte-for-byte as before.
 
 `ShapeObject.fade` turns a flat fill into a gradient to transparent — the black scrim that makes white
 type readable over a photo. Two pure functions carry it, and both are pinned by the selftest:
@@ -469,6 +479,27 @@ the top half is pure and selftested, `ThumbnailGrabberScreen` is the page. No se
   is not cropped, rows with any bright detail are picture, and a near-16:9 result snaps to exactly 16:9
   (JPEG smears the edge row, which otherwise gives 480 × 271).
 - Pasting a valid link looks it up at once; the page says thumbnails belong to their creators.
+
+### LinkedIn post maker (`/linkedin-post-maker`)
+
+The `linkedin` format plus a landing page (`LinkedInScreen`) that picks a size (4:5 recommended, square,
+landscape) or one of `data/linkedinTemplates.ts`'s layouts and opens the ordinary editor. The kit:
+
+- **Text collection** — `data/textCollection.ts`: `TEXT_PARTS` (headline with colour, kicker, label
+  plate, top banner, footer, corner tag, tweet card, quote, band headline, meme caption) each *build real
+  layers* sized by `fit(w, h)` (the 1080×1350 reference shrunk to the tighter side); multi-layer parts share
+  a `groupId`. The layouts reuse parts rather than re-describe them. The Text panel renders the list with
+  `TextPartPreview` (the real renderer, cropped to the part).
+- **Shadows** — `TEXT_SHADOWS` replaces shadow/outline/glow on whatever is selected; photo scrims (the
+  Elements panel's Shadows, plus "Dim") go in at `scrimIndex` — just above the topmost photo, under every
+  word — via `addObject(obj, { at })`.
+- A layout's bottom fade **ends where its photo ends, solid and in the page colour**; a fade that is still
+  translucent at the photo's edge shows that edge as a line.
+- The Preview dialog's `post` layout draws the feed post (author, caption, reactions) on desktop and phone,
+  and crops anything taller than 4:5 the way the feed does.
+- `designAssistant` treats an edge-to-edge bar as backdrop (`isBand`) and reads a headline's contrast
+  against the solid plate under it before falling back to the page background.
+- `Noto Sans Devanagari` is in `FONTS` (and the Google Fonts URL) for Hindi posts.
 
 ### Green screen backdrop
 

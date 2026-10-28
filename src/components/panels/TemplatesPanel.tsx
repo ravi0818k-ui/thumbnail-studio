@@ -48,7 +48,7 @@ export default function TemplatesPanel() {
       </div>
       <div className="tiles">
         {templates.map((t) => (
-          <TemplateTile key={t.id} template={t} portrait={format === 'shorts'} onPick={() => applyTemplate(t)} />
+          <TemplateTile key={t.id} template={t} ratio={`${size.width} / ${size.height}`} onPick={() => applyTemplate(t)} />
         ))}
       </div>
       {templates.length === 0 && <p className="muted">No templates match that search.</p>}
@@ -56,9 +56,10 @@ export default function TemplatesPanel() {
   )
 }
 
-function TemplateTile({ template, portrait, onPick }: { template: TemplateDef; portrait?: boolean; onPick: () => void }) {
+function TemplateTile({ template, ratio, onPick }: { template: TemplateDef; ratio: string; onPick: () => void }) {
+  // The tile takes the canvas' own shape, so a 4:5 post or a 9:16 cover is not cropped to 16:9.
   return (
-    <button className={`tile${portrait ? ' portrait' : ''}`} onClick={onPick} title={`${template.name} · ${template.category}`}>
+    <button className="tile" style={{ aspectRatio: ratio }} onClick={onPick} title={`${template.name} · ${template.category}`}>
       <TemplatePreview template={template} width={260} />
       <span className="tile-label">{template.name}</span>
     </button>

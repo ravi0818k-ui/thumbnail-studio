@@ -48,5 +48,6 @@ function normalizeObject(obj: SceneObject): SceneObject {
     ...text,
     autoFit: text.autoFit ?? 'off',
     noWrap: text.noWrap ?? false,
+    accents: Array.isArray(text.accents) ? text.accents : [],
   }
 }

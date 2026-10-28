@@ -20,13 +20,14 @@ import { getLoadedAsset, newId } from '../engine/assets'
 import { invalidateRaster } from '../engine/renderer'
 import { cloneObject, createImage } from '../engine/factory'
 import { coverCrop } from '../engine/crop'
+import { remapAccents } from '../engine/textAccents'
 import { boundingRect } from '../engine/geometry'
 import { DEFAULT_EXPORT, type ExportSettings } from '../engine/export'
 import { DEFAULT_FOCUS, type FocusOptions, type FocusSelection } from '../engine/objectMask'
 import type { TemplateDef } from '../data/templates'
 import { initialScreen } from '../router'
 
-export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals' | 'greenscreen' | 'remover' | 'tutorials' | 'grabber'
+export type Screen = 'home' | 'templates' | 'editor' | 'colors' | 'fonts' | 'fundamentals' | 'greenscreen' | 'remover' | 'tutorials' | 'grabber' | 'linkedin'
 export type GridMode = 'none' | 'grid' | 'thirds' | 'center'
 /**
  * 'clean' hands the stroke to the Python matte pass instead of erasing, and
@@ -50,6 +51,7 @@ export interface EditorState {
   removerReturnTo: Screen
   tutorialsReturnTo: Screen
   grabberReturnTo: Screen
+  linkedinReturnTo: Screen
   project: Project
   selection: string[]
   past: Snapshot[]
@@ -98,6 +100,8 @@ export interface EditorState {
   closeTutorials: () => void
   openGrabber: () => void
   closeGrabber: () => void
+  openLinkedIn: () => void
+  closeLinkedIn: () => void
   setPanel: (panel: PanelId | null) => void
   newProject: (options?: NewProjectOptions) => void
   setFormat: (format: CanvasFormat) => void
@@ -118,8 +122,9 @@ export interface EditorState {
   setEditingText: (id: string | null) => void
 
   // objects ---------------------------------------------------------------
-  addObject: (obj: SceneObject, opts?: { select?: boolean }) => void
-  addObjects: (objs: SceneObject[]) => void
+  /** `at` is a z-index to insert at; the default is the top of the stack. */
+  addObject: (obj: SceneObject, opts?: { select?: boolean; at?: number }) => void
+  addObjects: (objs: SceneObject[], opts?: { at?: number }) => void
   updateObject: <T extends SceneObject>(id: string, patch: Partial<T>) => void
   updateSelected: (patch: Partial<TextObject> | Partial<ImageObject> | Partial<ShapeObject>) => void
   removeSelected: () => void
@@ -170,6 +175,7 @@ const NEW_NAMES: Record<CanvasFormat, string> = {
   thumbnail: 'Untitled thumbnail',
   shorts: 'Untitled Shorts cover',
   banner: 'Untitled banner',
+  linkedin: 'Untitled LinkedIn post',
 }
 
 /** The panel a fresh project opens on: the gallery when the format has one. */
@@ -242,6 +248,7 @@ export const useEditor = create<EditorState>((set, get) => {
     removerReturnTo: 'home',
     tutorialsReturnTo: 'home',
     grabberReturnTo: 'home',
+    linkedinReturnTo: 'home',
     project: emptyProject(),
     selection: [],
     past: [],
@@ -290,6 +297,8 @@ export const useEditor = create<EditorState>((set, get) => {
     closeTutorials: () => set((s) => ({ screen: s.tutorialsReturnTo === 'tutorials' ? 'home' : s.tutorialsReturnTo })),
     openGrabber: () => set((s) => (s.screen === 'grabber' ? {} : { screen: 'grabber', grabberReturnTo: s.screen })),
     closeGrabber: () => set((s) => ({ screen: s.grabberReturnTo === 'grabber' ? 'home' : s.grabberReturnTo })),
+    openLinkedIn: () => set((s) => (s.screen === 'linkedin' ? {} : { screen: 'linkedin', linkedinReturnTo: s.screen })),
+    closeLinkedIn: () => set((s) => ({ screen: s.linkedinReturnTo === 'linkedin' ? 'home' : s.linkedinReturnTo })),
     setPanel: (panel) => set((s) => ({ panel: s.panel === panel ? null : panel })),
 
     newProject: (options = {}) => {
@@ -409,7 +418,10 @@ export const useEditor = create<EditorState>((set, get) => {
       if (!formatConfig(get().project.format).resizable) return
       get().pushHistory()
       invalidateRaster()
-      const format = formatForSize(width, height)
+      // Only the thumbnail and the Shorts cover are told apart by orientation;
+      // a LinkedIn post is a LinkedIn post at any of its sizes.
+      const current = get().project.format
+      const format = formatConfig(current).sizeDecidesFormat ? formatForSize(width, height) : current
       const formatChanged = format !== get().project.format
       mutate((p) => {
         p.width = width
@@ -444,21 +456,29 @@ export const useEditor = create<EditorState>((set, get) => {
 
     addObject: (obj, opts) => {
       get().pushHistory()
-      mutate((p) => void p.objects.push(obj))
+      mutate((p) => void p.objects.splice(opts?.at ?? p.objects.length, 0, obj))
       if (opts?.select !== false) set({ selection: [obj.id] })
     },
 
-    addObjects: (objs) => {
+    addObjects: (objs, opts) => {
       if (objs.length === 0) return
       get().pushHistory()
-      mutate((p) => void p.objects.push(...objs))
+      mutate((p) => void p.objects.splice(opts?.at ?? p.objects.length, 0, ...objs))
       set({ selection: objs.map((o) => o.id) })
     },
 
     updateObject: (id, patch) => {
       invalidateRaster(id)
       mutate((p) => {
-        p.objects = p.objects.map((o) => (o.id === id ? ({ ...o, ...patch } as SceneObject) : o))
+        p.objects = p.objects.map((o) => {
+          if (o.id !== id) return o
+          const next = { ...o, ...patch } as SceneObject
+          // Every text edit goes through here, so coloured words follow their text in one place.
+          if (o.type === 'text' && next.type === 'text' && 'text' in patch && !('accents' in patch)) {
+            next.accents = remapAccents(o.text, next.text, o.accents ?? [])
+          }
+          return next
+        })
       })
     },
 

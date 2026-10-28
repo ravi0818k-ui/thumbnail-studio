@@ -18,6 +18,7 @@ export default function HomeScreen() {
   const openGreenScreen = useEditor((s) => s.openGreenScreen)
   const openRemover = useEditor((s) => s.openRemover)
   const openGrabber = useEditor((s) => s.openGrabber)
+  const openLinkedIn = useEditor((s) => s.openLinkedIn)
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -59,27 +60,51 @@ export default function HomeScreen() {
           <h1 className="hero-title">Create YouTube thumbnails faster.</h1>
           <p className="hero-sub">
             Upload, cut out the background, add big readable text and download — horizontal thumbnails, vertical
-            Shorts covers and channel banners, all in your browser.
+            Shorts covers, channel banners and LinkedIn posts, all in your browser.
           </p>
           <TutorialCard />
           <h2 className="h2" style={{ marginTop: 0 }}>
             Create new design
           </h2>
           <div className="format-cards">
-            {FORMAT_LIST.map((format) => (
-              <button key={format.id} className="format-card" onClick={() => newProject({ format: format.id })}>
-                <span className="format-frame" data-format={format.id}>
-                  <span />
-                </span>
-                <span>
-                  <b>{format.label}</b>
-                  <em>
-                    {format.width} × {format.height}
-                  </em>
-                  <span className="muted">{format.description}</span>
-                </span>
-              </button>
-            ))}
+            {FORMAT_LIST.map((format) => {
+              const body = (
+                <>
+                  <span className="format-frame" data-format={format.id}>
+                    <span />
+                  </span>
+                  <span>
+                    <b>{format.label}</b>
+                    <em>
+                      {format.width} × {format.height}
+                    </em>
+                    <span className="muted">{format.description}</span>
+                  </span>
+                </>
+              )
+              // A LinkedIn post has three sizes and its own layouts, so it opens on its own page to choose.
+              if (format.id === 'linkedin') {
+                return (
+                  <a
+                    key={format.id}
+                    className="format-card"
+                    href="/linkedin-post-maker"
+                    onClick={(event) => {
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                      event.preventDefault()
+                      openLinkedIn()
+                    }}
+                  >
+                    {body}
+                  </a>
+                )
+              }
+              return (
+                <button key={format.id} className="format-card" onClick={() => newProject({ format: format.id })}>
+                  {body}
+                </button>
+              )
+            })}
           </div>
           <div className="row" style={{ marginTop: 12, gap: 8 }}>
             <button className="btn" onClick={() => setScreen('templates')}>

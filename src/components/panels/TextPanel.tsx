@@ -8,6 +8,13 @@ import { autoSizePatch } from '../../engine/text'
 import { familyWeights, nearestOf } from '../../engine/customFonts'
 import FontUpload from '../FontUpload'
 import type { TextObject } from '../../types'
+import { TEXT_PARTS, TEXT_PART_GROUPS, TEXT_SHADOWS, scrimIndex, withShadowStyle, type TextPart } from '../../data/textCollection'
+import { ELEMENTS } from '../../data/elements'
+import { createElement, createShape } from '../../engine/factory'
+import TextPartPreview from '../TextPartPreview'
+
+/** The photo shadows offered here — the Elements panel's scrims that sit under text. */
+const PHOTO_SHADOWS = ['shadow-bottom', 'shadow-top', 'shadow-vignette']
 
 export default function TextPanel() {
   const project = useEditor((s) => s.project)
@@ -41,6 +48,32 @@ export default function TextPanel() {
       return
     }
     await add({ ...preset.apply, text: 'YOUR TEXT' })
+  }
+
+  const addPart = async (part: TextPart) => {
+    const objects = part.build(project.width, project.height)
+    await Promise.all(objects.map((o) => (o.type === 'text' ? ensureFontLoaded(o.fontFamily, o.fontWeight, o.fontSize) : null)))
+    // Measured once the face is in, so each box is exactly as tall as its wrapped text.
+    const sized = objects.map((o) => (o.type === 'text' && o.autoHeight ? { ...o, ...autoSizePatch(o) } : o))
+    useEditor.getState().addObjects(sized)
+  }
+
+  const applyShadow = (id: string) => {
+    const style = TEXT_SHADOWS.find((t) => t.id === id)!
+    const state = useEditor.getState()
+    const targets = state.project.objects.filter((o) => state.selection.includes(o.id))
+    if (targets.length === 0) return
+    state.pushHistory()
+    for (const o of targets) state.updateObject(o.id, { effects: withShadowStyle(o.effects, style) })
+  }
+
+  const addPhotoShadow = (id: string | null) => {
+    const state = useEditor.getState()
+    const { width, height, objects } = state.project
+    const scrim = id
+      ? createElement(ELEMENTS.find((e) => e.id === id)!, width, height)
+      : createShape({ name: 'Dim', shape: 'rect', x: 0, y: 0, width, height, fill: '#000000', opacity: 45, cornerRadius: 0 })
+    state.addObject(scrim, { at: scrimIndex(objects) })
   }
 
   // A family uploaded while text is selected goes straight onto that text.
@@ -78,6 +111,58 @@ export default function TextPanel() {
           Body
         </button>
       </div>
+
+      <div className="section-head" style={{ marginTop: 20 }}>
+        Text collection
+      </div>
+      {TEXT_PART_GROUPS.map((group) => (
+        <div key={group} className="part-group">
+          <span className="part-group-name">{group}</span>
+          <div className="part-grid">
+            {TEXT_PARTS.filter((p) => p.group === group).map((part) => (
+              <button key={part.id} className="part-tile" onClick={() => addPart(part)} title={part.hint}>
+                <TextPartPreview part={part} />
+                <span>{part.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="section-head" style={{ marginTop: 20 }}>
+        Text shadow
+      </div>
+      <div className="shadow-grid">
+        {TEXT_SHADOWS.map((t) => (
+          <button
+            key={t.id}
+            className={`shadow-chip shadow-${t.id}`}
+            onClick={() => applyShadow(t.id)}
+            disabled={selection.length === 0}
+            title={selection.length === 0 ? 'Select a layer first' : t.hint}
+          >
+            <span>Aa</span>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="section-head" style={{ marginTop: 20 }}>
+        Shadow behind text
+      </div>
+      <div className="grid-2">
+        {PHOTO_SHADOWS.map((id) => (
+          <button key={id} className="btn small" onClick={() => addPhotoShadow(id)}>
+            {ELEMENTS.find((e) => e.id === id)!.label}
+          </button>
+        ))}
+        <button className="btn small" onClick={() => addPhotoShadow(null)}>
+          Dim whole photo
+        </button>
+      </div>
+      <p className="muted" style={{ marginTop: 8 }}>
+        Shadows go in just above your photo, under every word, so the text stays bright.
+      </p>
 
       <div className="section-head" style={{ marginTop: 20 }}>
         One-click styles

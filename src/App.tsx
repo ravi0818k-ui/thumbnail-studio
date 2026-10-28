@@ -10,17 +10,19 @@ import MobileNotice from './components/MobileNotice'
 import BgRemoverScreen from './components/BgRemoverScreen'
 import TutorialsScreen from './components/TutorialsScreen'
 import ThumbnailGrabberScreen from './components/ThumbnailGrabberScreen'
+import LinkedInScreen from './components/LinkedInScreen'
 import { useRouteSync } from './hooks'
 
 export default function App() {
   const screen = useEditor((s) => s.screen)
   useRouteSync()
-  // The green screen is meant to be propped up on a phone or tablet, and the tutorials and the downloader
-  // are a single column, so none of them warns.
+  // The green screen is meant to be propped up on a phone or tablet, and the tutorials, the downloader
+  // and the LinkedIn landing page are a single column, so none of them warns.
+  const quiet: string[] = ['greenscreen', 'tutorials', 'grabber', 'linkedin']
   return (
     <>
       <Screen />
-      {screen !== 'greenscreen' && screen !== 'tutorials' && screen !== 'grabber' && <MobileNotice />}
+      {!quiet.includes(screen) && <MobileNotice />}
     </>
   )
 }
@@ -36,5 +38,6 @@ function Screen() {
   if (screen === 'remover') return <BgRemoverScreen />
   if (screen === 'tutorials') return <TutorialsScreen />
   if (screen === 'grabber') return <ThumbnailGrabberScreen />
+  if (screen === 'linkedin') return <LinkedInScreen />
   return <Editor />
 }

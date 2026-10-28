@@ -41,6 +41,9 @@ export default function PreviewDialog() {
 
   const config = formatConfig(project.format)
   const isBanner = !!config.guides
+  // Competing videos and a resume bar only exist on surfaces that show videos.
+  const isPost = surfacesFor(project.format).every((s) => s.layout === 'post')
+  const videoFeed = !isBanner && !isPost
   // A bar painted into the design already sits where the simulated one would.
   const painted = !!watchedBarRects(project)
 
@@ -73,19 +76,25 @@ export default function PreviewDialog() {
         <input
           className="input pv-title-input"
           value={title}
-          placeholder={isBanner ? 'Your channel name' : 'Type the title you will publish with'}
+          placeholder={
+            isBanner ? 'Your channel name' : isPost ? 'The caption you will post with' : 'Type the title you will publish with'
+          }
           onChange={(e) => setTitle(e.target.value)}
         />
         <Segmented
           value={theme}
           onChange={(next: Theme) => setTheme(next)}
           options={[
-            { value: 'dark', label: 'Dark', title: "YouTube's default for most viewers" },
-            { value: 'light', label: 'Light', title: 'Where a light thumbnail can disappear into the page' },
+            { value: 'dark', label: 'Dark', title: isPost ? 'LinkedIn dark mode' : "YouTube's default for most viewers" },
+            {
+              value: 'light',
+              label: 'Light',
+              title: isPost ? "LinkedIn's default" : 'Where a light thumbnail can disappear into the page',
+            },
           ]}
         />
-        {!isBanner && <Toggle label="Competing videos" checked={neighbours} onChange={setNeighbours} />}
-        {!isBanner && !painted && <Toggle label="Partly watched" checked={watched} onChange={setWatched} />}
+        {videoFeed && <Toggle label="Competing videos" checked={neighbours} onChange={setNeighbours} />}
+        {videoFeed && !painted && <Toggle label="Partly watched" checked={watched} onChange={setWatched} />}
         <Toggle label="Grayscale" checked={gray} onChange={setGray} />
       </div>
 
@@ -123,7 +132,12 @@ export default function PreviewDialog() {
       </div>
 
       <p className="muted pv-footnote">
-        {isBanner ? (
+        {isPost ? (
+          <>
+            Sizes are the post column on a desktop window and the full width of a 390 px phone. LinkedIn shows a 4:5
+            image uncropped; anything taller is cut to 4:5.
+          </>
+        ) : isBanner ? (
           <>
             Each device keeps a centred band of the one {project.width} × {project.height} upload and throws the rest
             away — these are those bands, at about the width each device gives the channel header.
@@ -242,6 +256,17 @@ function Surface({ surface, url, title, neighbours, watched, project }: SurfaceP
 
     case 'banner':
       return <ChannelHeader url={url} title={title} surface={surface} project={project} />
+
+    case 'post':
+      // The feed shows up to 4:5; a taller image is cut to it, centred.
+      return (
+        <FeedPost
+          url={url}
+          caption={title}
+          width={surface.width}
+          ratio={project.height / project.width > 1.25 ? '4 / 5' : ratio}
+        />
+      )
   }
 }
 
@@ -252,6 +277,43 @@ function Surface({ surface, url, title, neighbours, watched, project }: SurfaceP
 function surfaceScale(surface: PreviewSurface, format: SurfaceProps['project']['format']): number {
   const guide = formatConfig(format).guides?.find((g) => g.id === surface.guide)
   return guide ? formatConfig(format).width / guide.width : 1
+}
+
+/**
+ * A LinkedIn feed post: the author row and the first lines of the caption sit
+ * above the image and the reaction bar below it, which is the company a post
+ * image keeps — it is read after a name and a sentence, not on its own.
+ */
+function FeedPost({ url, caption, width, ratio }: { url: string; caption: string; width: number; ratio: string }) {
+  return (
+    <div className="pv-post" style={{ width }}>
+      <div className="pv-post-head">
+        <span className="pv-avatar large" />
+        <div>
+          <span className="pv-line-title">Your Name</span>
+          <span className="pv-line-sub">Founder · Writes about careers and tech</span>
+          <span className="pv-line-sub">1h · 🌐</span>
+        </div>
+        <span className="pv-post-follow">+ Follow</span>
+      </div>
+      <p className="pv-post-caption">
+        {caption || 'The first two lines of your caption show here'} <span>…more</span>
+      </p>
+      <div className="pv-post-image" style={{ aspectRatio: ratio }}>
+        {url ? <img src={url} alt="" /> : null}
+      </div>
+      <div className="pv-post-counts">
+        <span>👍❤️💡 1,284</span>
+        <span>96 comments · 41 reposts</span>
+      </div>
+      <div className="pv-post-actions">
+        <span>Like</span>
+        <span>Comment</span>
+        <span>Repost</span>
+        <span>Send</span>
+      </div>
+    </div>
+  )
 }
 
 /** One device's band of the banner, with the channel row beneath it. */

@@ -1219,12 +1219,13 @@ console.log('run a test')
   console.log('preview surfaces')
   const { FORMATS } = await import('../src/data/formats')
   const { surfacesFor, groupedSurfaces, smallestSurface } = await import('../src/data/previewSurfaces')
-  const LAYOUTS = ['grid', 'row', 'feature', 'bare', 'immersive', 'tv', 'phone', 'banner']
-  for (const format of ['thumbnail', 'shorts', 'banner'] as const) {
+  const LAYOUTS = ['grid', 'row', 'feature', 'bare', 'immersive', 'tv', 'phone', 'banner', 'post']
+  for (const format of ['thumbnail', 'shorts', 'banner', 'linkedin'] as const) {
     const surfaces = surfacesFor(format)
     const config = FORMATS[format]
-    // A banner has one surface per device; a card format needs the full spread of sizes.
-    const expected = config.guides ? config.guides.length : 5
+    // A banner has one surface per device; a post fills the feed column on desktop and on a phone;
+    // a card format needs the full spread of sizes.
+    const expected = config.guides ? config.guides.length : format === 'linkedin' ? 2 : 5
     check(`${format}: surfaces are defined`, surfaces.length >= expected, String(surfaces.length))
     check(`${format}: ids are unique`, new Set(surfaces.map((s) => s.id)).size === surfaces.length)
     check(`${format}: every layout is one the dialog renders`, surfaces.every((s) => LAYOUTS.includes(s.layout)))
@@ -2710,6 +2711,205 @@ console.log('uploaded fonts')
     await refuses(async () => ff.fontsInZip(await zipOf([{ name: 'Liar.ttf', bytes: black, deflated: true, size: 10 }]))),
   )
   check('a cut-off zip is refused', await refuses(() => ff.fontsInZip(zip.subarray(0, zip.length - 30))))
+}
+
+// ---------------------------------------------------------- coloured words
+{
+  console.log('coloured words')
+  const ta = await import('../src/engine/textAccents')
+  const { layoutText } = await import('../src/engine/text')
+  const { createText } = await import('../src/engine/factory')
+  const G = '#22c55e'
+  const R = '#ef4444'
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+
+  const text = 'Companies want a Full Stack Developer'
+  const words = ta.wordsOf(text)
+  check('words carry their offsets', words.every((w) => text.slice(w.start, w.end) === w.word) && words.length === 6)
+  let accents = ta.toggleWord([], text, words[3], G)
+  accents = ta.toggleWord(accents, text, words[4], G)
+  accents = ta.toggleWord(accents, text, words[5], G)
+  check('painting a phrase word by word gives one run', same(accents, [{ start: 17, end: 37, color: G }]), JSON.stringify(accents))
+  check('clicking a coloured word clears it', same(ta.toggleWord(accents, text, words[4], G), [
+    { start: 17, end: 21, color: G },
+    { start: 28, end: 37, color: G },
+  ]))
+  check('another colour repaints rather than clears', same(ta.toggleWord(accents, text, words[4], R).map((a) => a.color), [G, R, G]))
+  check('painting the middle splits a run', ta.paintAccent(accents, text, 22, 27, null).length === 2)
+  check('clean drops empty and out-of-range runs', same(ta.cleanAccents([{ start: 5, end: 5, color: G }, { start: 30, end: 99, color: R }], 'short'), []))
+  check('clean sorts', same(ta.cleanAccents([{ start: 3, end: 4, color: R }, { start: 0, end: 1, color: G }], 'abcde').map((a) => a.start), [0, 3]))
+  check('different colours side by side stay apart', ta.cleanAccents([{ start: 0, end: 2, color: G }, { start: 3, end: 5, color: R }], 'ab cd').length === 2)
+
+  // Editing keeps colour on its words.
+  const one = [{ start: 17, end: 37, color: G }]
+  check('typing before shifts the run', same(ta.remapAccents(text, 'Big ' + text, one), [{ start: 21, end: 41, color: G }]))
+  check('typing after leaves it', same(ta.remapAccents(text, text + '!', one), one))
+  check('typing inside extends it', same(ta.remapAccents(text, text.replace('Stack', 'Stacks'), one), [{ start: 17, end: 38, color: G }]))
+  check('deleting a coloured word shrinks it', same(ta.remapAccents(text, text.replace(' Stack', ''), one), [{ start: 17, end: 31, color: G }]))
+  check('deleting the whole run removes it', same(ta.remapAccents(text, 'Companies want a ', one), []))
+  check('retyping the run keeps the colour on what replaced it', same(ta.remapAccents('ab XY cd', 'ab Z cd', [{ start: 3, end: 5, color: G }]), [{ start: 3, end: 4, color: G }]))
+  check('no accents is a no-op', ta.remapAccents('a', 'b', []).length === 0)
+
+  // Uppercasing can lengthen the text, and accents index the source.
+  const map = ta.displayMap('straße x', true)
+  check('uppercasing maps every display character to its source', map.display === 'STRASSE X' && map.source[4] === 4 && map.source[5] === 4 && map.source[6] === 5 && map.source[8] === 7)
+  check('a plain string maps to itself', ta.displayMap('abc', false).source.join() === '0,1,2')
+
+  // Layout records where every line starts, so the runs can be found.
+  const ctx = {
+    font: '',
+    textAlign: 'left',
+    measureText: (t: string) => ({ width: t.length * 10, actualBoundingBoxAscent: 7, actualBoundingBoxDescent: 2 }),
+  } as unknown as CanvasRenderingContext2D
+  const probe = (t: string, extra: Record<string, unknown> = {}) =>
+    createText({ text: t, fontSize: 10, width: 110, letterSpacing: 0, uppercase: false, ...extra })
+  const starts = (t: string, extra?: Record<string, unknown>) => {
+    const obj = probe(t, extra)
+    const layout = layoutText(ctx, obj)
+    const display = obj.uppercase ? obj.text.toUpperCase() : obj.text
+    return layout.lines.every((line, i) => display.slice(layout.starts[i], layout.starts[i] + line.length) === line) && layout.starts.length === layout.lines.length
+  }
+  check('line starts point at their lines', starts('alpha beta gamma delta epsilon'))
+  check('…across newlines and blank lines', starts('alpha beta\n\ngamma  delta   epsilon zeta'))
+  check('…with no wrap', starts('one two three four five\nsix', { noWrap: true }))
+  check('…uppercased', starts('alpha beta gamma', { uppercase: true }))
+  check('…when a word is wider than the box', starts('supercalifragilistic is long'))
+  const wrapped = layoutText(ctx, probe('alpha beta gamma'))
+  check('wrapping is unchanged', same(wrapped.lines, ['alpha beta', 'gamma']) && same(wrapped.starts, [0, 11]))
+
+  const runs = ta.lineRuns('gamma', 11, ta.displayMap('alpha beta gamma', false).source, [{ start: 6, end: 13, color: G }], '#fff')
+  check('a run that wraps keeps its colour on the next line', same(runs, [{ text: 'ga', color: G }, { text: 'mma', color: '#fff' }]), JSON.stringify(runs))
+
+  // The store keeps accents with their words on every text edit.
+  const { useEditor } = await import('../src/store/editorStore')
+  useEditor.getState().newProject({ format: 'linkedin' })
+  const layer = createText({ text, accents: one })
+  useEditor.getState().addObject(layer)
+  useEditor.getState().updateObject(layer.id, { text: 'Big ' + text })
+  const edited = useEditor.getState().project.objects.find((o) => o.id === layer.id) as typeof layer
+  check('editing text in the store moves its colour', same(edited.accents, [{ start: 21, end: 41, color: G }]))
+  useEditor.getState().updateObject(layer.id, { text: 'x', accents: one })
+  check('an explicit accents patch is taken as given', same((useEditor.getState().project.objects.find((o) => o.id === layer.id) as typeof layer).accents, one))
+  const { normalizeProject } = await import('../src/engine/normalize')
+  const old = { ...useEditor.getState().project, objects: [{ ...layer, accents: undefined }] }
+  check('older text layers gain no accents', same((normalizeProject(old as never).objects[0] as typeof layer).accents, []))
+}
+
+// ------------------------------------------------------------ LinkedIn post
+{
+  console.log('linkedin post')
+  const { FORMATS, FORMAT_LIST, formatConfig, defaultSafeZone } = await import('../src/data/formats')
+  const { templatesForFormat, TEMPLATE_CATEGORIES } = await import('../src/data/templates')
+  const { LINKEDIN_TEMPLATES } = await import('../src/data/linkedinTemplates')
+  const tc = await import('../src/data/textCollection')
+  const { FONTS } = await import('../src/data/fonts')
+  const { analyzeDesign } = await import('../src/engine/designAssistant')
+  const { useEditor } = await import('../src/store/editorStore')
+  const { cleanAccents } = await import('../src/engine/textAccents')
+  const { DEFAULT_EFFECTS } = await import('../src/types')
+  type Obj = import('../src/types').SceneObject
+  const { readFileSync } = await import('node:fs')
+
+  const li = FORMATS.linkedin
+  check('LinkedIn is a format', FORMAT_LIST.includes(li) && li.width === 1080 && li.height === 1350)
+  check('4:5 is the recommended size', li.presets.find((p) => p.recommended)?.height === 1350 && li.presets.length === 3)
+  check('a post is not scored as a video card', !li.scored && !li.watchedBar && !li.newBadge)
+  check('only thumbnail and Shorts switch by orientation', FORMAT_LIST.filter((f) => f.sizeDecidesFormat).map((f) => f.id).join() === 'thumbnail,shorts')
+  check('every format states its headline floor and word budget', FORMAT_LIST.every((f) => f.minHeadline > 0 && f.wordBudget > 0))
+
+  useEditor.getState().newProject({ format: 'linkedin' })
+  useEditor.getState().setCanvasSize(1200, 627)
+  check('a landscape post stays a LinkedIn post', useEditor.getState().project.format === 'linkedin')
+  useEditor.getState().setCanvasSize(1080, 1350)
+  check('a portrait post does not become a Short', useEditor.getState().project.format === 'linkedin')
+  useEditor.getState().newProject({ format: 'thumbnail' })
+  useEditor.getState().setCanvasSize(1080, 1920)
+  check('a portrait thumbnail still becomes a Short', useEditor.getState().project.format === 'shorts')
+
+  // Text parts land on the canvas, in proportion, at every post size.
+  const known = new Set(FONTS.map((f) => f.family))
+  const validAccents = (objects: Obj[]) =>
+    objects.every((o) => o.type !== 'text' || JSON.stringify(cleanAccents(o.accents, o.text)) === JSON.stringify(o.accents))
+  check('part ids are unique', new Set(tc.TEXT_PARTS.map((p) => p.id)).size === tc.TEXT_PARTS.length)
+  check('every part is in a listed group', tc.TEXT_PARTS.every((p) => tc.TEXT_PART_GROUPS.includes(p.group)))
+  check('every group has a part', tc.TEXT_PART_GROUPS.every((g) => tc.TEXT_PARTS.some((p) => p.group === g)))
+  for (const size of li.presets) {
+    for (const part of tc.TEXT_PARTS) {
+      const objects = part.build(size.width, size.height)
+      const inside = objects.every((o) => o.x >= 0 && o.y >= 0 && o.x + o.width <= size.width + 1 && o.y + o.height <= size.height + 1)
+      check(`part "${part.label}" fits ${size.width} × ${size.height}`, objects.length > 0 && inside)
+    }
+  }
+  check('parts name only fonts the picker offers', tc.TEXT_PARTS.every((p) => p.build(1080, 1350).every((o) => o.type !== 'text' || known.has(o.fontFamily))))
+  check('part accents are clean', tc.TEXT_PARTS.every((p) => validAccents(p.build(1080, 1350))))
+  check('a multi-layer part is one group', tc.TEXT_PARTS.every((p) => {
+    const objects = p.build(1080, 1350)
+    return objects.length === 1 || (objects[0].groupId !== null && objects.every((o) => o.groupId === objects[0].groupId))
+  }))
+  check('accentOn refuses a phrase the text lacks', (() => {
+    try {
+      tc.accentOn('abc', 'zz', '#fff')
+      return false
+    } catch {
+      return true
+    }
+  })())
+
+  // Shadows.
+  const fx = JSON.parse(JSON.stringify(DEFAULT_EFFECTS))
+  fx.glow.enabled = true
+  const none = tc.withShadowStyle(fx, tc.TEXT_SHADOWS.find((t) => t.id === 'none')!)
+  check('"None" clears shadow, outline and glow', !none.shadow.enabled && !none.outline.enabled && !none.glow.enabled)
+  const meme = tc.withShadowStyle(fx, tc.TEXT_SHADOWS.find((t) => t.id === 'meme')!)
+  check('a style turns on what it names and off what it does not', meme.outline.enabled && meme.shadow.enabled && !meme.glow.enabled)
+  check('a style leaves the colour overlay alone', tc.withShadowStyle({ ...fx, overlay: { ...fx.overlay, enabled: true } }, tc.TEXT_SHADOWS[1]).overlay.enabled)
+  check('shadow ids are unique', new Set(tc.TEXT_SHADOWS.map((t) => t.id)).size === tc.TEXT_SHADOWS.length)
+  const panelCss = readFileSync('src/styles.css', 'utf8')
+  check('every shadow chip has a preview style', tc.TEXT_SHADOWS.every((t) => t.id === 'none' || panelCss.includes(`.shadow-${t.id} span`)))
+
+  // A scrim goes above the photo and under the words.
+  const { createImage, createText, createShape } = await import('../src/engine/factory')
+  const photo = createImage('a', 10, 10, 100, 100)
+  const icon = { ...createImage('b', 10, 10, 100, 100), icon: 'tabler:star' }
+  const words = createText({ text: 'hi' })
+  check('a scrim lands just above the topmost photo', tc.scrimIndex([photo, words]) === 1 && tc.scrimIndex([createShape(), photo, icon, words]) === 2)
+  check('with no photo a scrim goes to the bottom', tc.scrimIndex([words]) === 0)
+  useEditor.getState().newProject({ format: 'linkedin' })
+  useEditor.getState().addObject(words)
+  useEditor.getState().addObject(createShape({ name: 'scrim' }), { at: 0 })
+  check('addObject can insert below', useEditor.getState().project.objects[0].name === 'scrim')
+
+  // Layouts.
+  check('LinkedIn layouts are tagged', LINKEDIN_TEMPLATES.length >= 7 && LINKEDIN_TEMPLATES.every((t) => t.format === 'linkedin'))
+  check('the LinkedIn gallery is exactly its layouts', templatesForFormat('linkedin').length === LINKEDIN_TEMPLATES.length)
+  check('layout categories are listed', LINKEDIN_TEMPLATES.every((t) => (TEMPLATE_CATEGORIES as readonly string[]).includes(t.category)))
+  for (const template of LINKEDIN_TEMPLATES) {
+    for (const size of li.presets) {
+      const built = template.build(size.width, size.height)
+      const onCanvas = built.objects.every((o) => o.x >= -1 && o.y >= -1 && o.x + o.width <= size.width + 1 && o.y + o.height <= size.height + 1)
+      check(`layout "${template.name}" stays on a ${size.width} × ${size.height} canvas`, onCanvas)
+    }
+    const built = template.build(1080, 1350)
+    const project = {
+      id: 'l',
+      name: 'Post',
+      format: 'linkedin' as const,
+      width: 1080,
+      height: 1350,
+      safeZone: defaultSafeZone('linkedin'),
+      background: built.background,
+      objects: built.objects,
+      createdAt: 0,
+      updatedAt: 0,
+    }
+    const failed = analyzeDesign(project as never).checks.filter((c) => c.status === 'fail')
+    check(`layout "${template.name}" has no failing checks`, failed.length === 0, failed.map((f) => `${f.id}: ${f.detail}`).join(' | '))
+    check(`layout "${template.name}" uses offered fonts`, built.objects.every((o) => o.type !== 'text' || known.has(o.fontFamily)))
+    check(`layout "${template.name}" has clean accents`, validAccents(built.objects))
+  }
+  check('at least one layout colours words', LINKEDIN_TEMPLATES.some((t) => t.build(1080, 1350).objects.some((o) => o.type === 'text' && o.accents.length > 0)))
+  check('the Hindi face is loaded by the page', readFileSync('index.html', 'utf8').includes('Noto+Sans+Devanagari') && known.has('Noto Sans Devanagari'))
+  check('formatConfig knows the post', formatConfig('linkedin').exportLabel === 'Download Post')
 }
 
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)

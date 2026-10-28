@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useEditor } from '../../store/editorStore'
 import type { AutoFit, TextObject } from '../../types'
 import { ColorInput, Field, NumberInput, Section, Segmented, Slider, Toggle } from '../ui'
@@ -8,10 +9,12 @@ import { autoSizePatch } from '../../engine/text'
 import { SWATCHES } from '../../data/backgrounds'
 import { familyWeights, nearestOf, useCustomFonts } from '../../engine/customFonts'
 import FontUpload from '../FontUpload'
+import AccentSection from './AccentSection'
 
 export default function TextProperties({ object }: { object: TextObject }) {
   const updateObject = useEditor((s) => s.updateObject)
   const pushHistory = useEditor((s) => s.pushHistory)
+  const textarea = useRef<HTMLTextAreaElement>(null)
 
   const set = (patch: Partial<TextObject>) => {
     updateObject<TextObject>(object.id, patch)
@@ -37,6 +40,7 @@ export default function TextProperties({ object }: { object: TextObject }) {
     <>
       <Section title="Text">
         <textarea
+          ref={textarea}
           className="input"
           value={object.text}
           onFocus={() => pushHistory(`text:${object.id}`)}
@@ -61,6 +65,8 @@ export default function TextProperties({ object }: { object: TextObject }) {
           />
         </div>
       </Section>
+
+      <AccentSection object={object} textarea={textarea} />
 
       <Section title="Auto fit">
         <Field label="Mode" stack>

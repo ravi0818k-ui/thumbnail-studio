@@ -8,6 +8,7 @@ import { SHORTS_TEMPLATES } from './shortsTemplates'
 import { SUPER_LEARNER_TEMPLATES } from './superLearnerTemplates'
 import { JUSTIN_SUNG_TEMPLATES } from './justinSungTemplates'
 import { VIVIAN_TEMPLATES } from './vivianTemplates'
+import { LINKEDIN_TEMPLATES } from './linkedinTemplates'
 
 export const TEMPLATE_CATEGORIES = [
   'All',
@@ -28,6 +29,8 @@ export const TEMPLATE_CATEGORIES = [
   'Business',
   'Tutorial',
   'Personal Brand',
+  'Quote',
+  'Meme',
 ] as const
 
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number]
@@ -561,4 +564,5 @@ export const TEMPLATES: TemplateDef[] = [
   ...withBrand(VIVIAN_TEMPLATES, 'vivian'),
   ...GENERAL_TEMPLATES,
   ...SHORTS_TEMPLATES,
+  ...LINKEDIN_TEMPLATES,
 ]

@@ -176,6 +176,7 @@ export function useRouteSync() {
         remover: { open: state.openRemover, close: state.closeRemover },
         tutorials: { open: state.openTutorials, close: state.closeTutorials },
         grabber: { open: state.openGrabber, close: state.closeGrabber },
+        linkedin: { open: state.openLinkedIn, close: state.closeLinkedIn },
       }
       if (route && route.screen !== state.screen) routed[route.screen]?.open()
       else if (!route) routed[state.screen]?.close()

@@ -29,6 +29,8 @@ export type SurfaceLayout =
   | 'tv'
   /** A channel header: only the band one device keeps of a banner. */
   | 'banner'
+  /** A LinkedIn feed post: author row and caption above the image, reactions below. */
+  | 'post'
 
 export interface PreviewSurface {
   id: string
@@ -142,10 +144,33 @@ const BANNER_SURFACES: PreviewSurface[] = [
   },
 ]
 
+// A LinkedIn image is never a small card in a grid: it fills the post column.
+// The feed is about 555 px wide on desktop and the full phone width on mobile,
+// which makes a post far more forgiving than a thumbnail — and the caption
+// above it is competing for the same glance.
+const LINKEDIN_SURFACES: PreviewSurface[] = [
+  {
+    id: 'li-desktop',
+    group: 'Desktop',
+    label: 'Feed · desktop',
+    width: 552,
+    layout: 'post',
+  },
+  {
+    id: 'li-mobile',
+    group: 'Mobile',
+    label: 'Feed · phone app',
+    width: 390,
+    layout: 'post',
+    note: 'Most of the feed is read here. A 4:5 post fills most of the screen; a landscape one does not.',
+  },
+]
+
 const SURFACES: Record<CanvasFormat, PreviewSurface[]> = {
   thumbnail: THUMBNAIL_SURFACES,
   shorts: SHORTS_SURFACES,
   banner: BANNER_SURFACES,
+  linkedin: LINKEDIN_SURFACES,
 }
 
 export function surfacesFor(format: CanvasFormat): PreviewSurface[] {

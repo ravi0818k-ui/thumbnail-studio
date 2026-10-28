@@ -9,6 +9,8 @@ export interface TextInk {
 
 export interface TextLayout {
   lines: string[]
+  /** Offset of each line in the displayed text, so accents can find their characters. */
+  starts: number[]
   lineHeight: number
   totalHeight: number
   maxWidth: number
@@ -122,37 +124,45 @@ export function layoutText(ctx: Ctx, obj: TextObject): TextLayout {
   applyTextFont(ctx, obj)
   const source = getDisplayText(obj)
   const lines: string[] = []
-  if (obj.noWrap) {
-    // Explicit line breaks only — the creator decides where lines end.
-    for (const paragraph of source.split('\n')) lines.push(paragraph)
-    return finishLayout(ctx, obj, lines)
-  }
+  const starts: number[] = []
+  let offset = 0
   for (const paragraph of source.split('\n')) {
-    if (!paragraph) {
-      lines.push('')
+    const at = offset
+    offset += paragraph.length + 1
+    // No wrap: explicit line breaks only — the creator decides where lines end.
+    if (!paragraph || obj.noWrap) {
+      lines.push(paragraph)
+      starts.push(at)
       continue
     }
-    const words = paragraph.split(/(\s+)/).filter((w) => w !== '')
     let current = ''
-    for (const word of words) {
+    let currentStart = at
+    for (const token of paragraph.matchAll(/\s+|\S+/g)) {
+      const word = token[0]
       const candidate = current + word
-      if (measureLine(ctx, candidate.trimEnd(), obj.letterSpacing) <= obj.width || current === '') {
+      if (current === '') {
+        current = word
+        currentStart = at + token.index!
+      } else if (measureLine(ctx, candidate.trimEnd(), obj.letterSpacing) <= obj.width) {
         current = candidate
       } else {
         lines.push(current.trimEnd())
+        starts.push(currentStart)
         current = word.trimStart()
+        currentStart = at + token.index! + (word.length - current.length)
       }
     }
     lines.push(current.trimEnd())
+    starts.push(currentStart)
   }
-  return finishLayout(ctx, obj, lines)
+  return finishLayout(ctx, obj, lines, starts)
 }
 
-function finishLayout(ctx: Ctx, obj: TextObject, lines: string[]): TextLayout {
+function finishLayout(ctx: Ctx, obj: TextObject, lines: string[], starts: number[]): TextLayout {
   const lineHeight = obj.fontSize * obj.lineHeight
   const maxWidth = lines.reduce((m, l) => Math.max(m, measureLine(ctx, l, obj.letterSpacing)), 0)
   const ink = measureInk(ctx, obj, lines)
-  return { lines, lineHeight, maxWidth, ink, totalHeight: contentHeight(lines.length, lineHeight, ink, obj) }
+  return { lines, starts, lineHeight, maxWidth, ink, totalHeight: contentHeight(lines.length, lineHeight, ink, obj) }
 }
 
 /**

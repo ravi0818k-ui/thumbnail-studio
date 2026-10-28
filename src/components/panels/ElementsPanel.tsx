@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useEditor } from '../../store/editorStore'
 import { ELEMENTS, ELEMENT_CATEGORIES, EMOJI, type ElementDef } from '../../data/elements'
 import { createElement, createText } from '../../engine/factory'
+import { scrimIndex } from '../../data/textCollection'
 
 export default function ElementsPanel() {
   const project = useEditor((s) => s.project)
@@ -26,7 +27,10 @@ export default function ElementsPanel() {
             key={def.id}
             className="element-btn"
             title={def.label}
-            onClick={() => addObject(createElement(def, project.width, project.height))}
+            onClick={() =>
+              // A scrim belongs under the words it exists to make readable.
+              addObject(createElement(def, project.width, project.height), def.fullBleed ? { at: scrimIndex(project.objects) } : undefined)
+            }
           >
             <ElementPreview def={def} />
           </button>

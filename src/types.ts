@@ -7,10 +7,10 @@
 export type ObjectType = 'image' | 'text' | 'shape'
 
 /**
- * One editor engine, three products (spec §39): the format only changes canvas
+ * One editor engine, four products (spec §39): the format only changes canvas
  * size, safe zones, templates, presets and composition rules.
  */
-export type CanvasFormat = 'thumbnail' | 'shorts' | 'banner'
+export type CanvasFormat = 'thumbnail' | 'shorts' | 'banner' | 'linkedin'
 
 /**
  * The devices a channel banner is cropped for. Each one sees a centred band of
@@ -184,6 +184,17 @@ export interface ImageObject extends BaseObject {
 
 export type TextAlign = 'left' | 'center' | 'right'
 
+/**
+ * A run of the text drawn in another colour — the green keyword inside a white
+ * sentence. Offsets are into `text` (end exclusive), so an accent wraps with
+ * its words; `remapAccents` keeps it on the same words as the text is edited.
+ */
+export interface TextAccent {
+  start: number
+  end: number
+  color: string
+}
+
 export interface TextObject extends BaseObject {
   type: 'text'
   text: string
@@ -210,6 +221,8 @@ export interface TextObject extends BaseObject {
   autoFit: AutoFit
   /** Keeps a line together instead of wrapping at the box width. */
   noWrap: boolean
+  /** Words in another colour, sorted and non-overlapping. */
+  accents: TextAccent[]
 }
 
 export type ShapeKind =

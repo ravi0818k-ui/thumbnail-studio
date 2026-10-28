@@ -23,15 +23,9 @@ export interface DesignReport {
 
 const isText = (o: SceneObject): o is TextObject => o.type === 'text'
 
-/**
- * Smallest headline that still reads on a phone, as a share of canvas height.
- * A Short fills the screen, so it can carry proportionally smaller text than a
- * thumbnail shown in a 168 px grid cell.
- */
+/** Smallest headline that still reads on a phone, as a share of canvas height (see formats.ts). */
 function minHeadlineRatio(project: Project): number {
-  // A banner's mobile band is shown about 390 px wide, a quarter of its 1546,
-  // so 5% of the canvas lands near 18 px on a phone.
-  return project.format === 'shorts' ? 0.045 : project.format === 'banner' ? 0.05 : 0.1
+  return formatConfig(project.format).minHeadline
 }
 
 const contains = (outer: Rect, inner: Rect) =>
@@ -102,8 +96,8 @@ export function analyzeDesign(project: Project): DesignReport {
       const b = boundingRect([o])!
       return b.x < warning.x || b.y < warning.y || b.x + b.width > warning.x + warning.width || b.y + b.height > warning.y + warning.height
     })
-    // Full-bleed photos and backdrops are meant to run to the edge.
-    const offenders = outside.filter((o) => !isFullBleed(o, project))
+    // Full-bleed photos and backdrops, and edge-to-edge bars, are meant to run to the edge.
+    const offenders = outside.filter((o) => !isFullBleed(o, project) && !isBand(o, project))
     checks.push({
       id: 'safe-area',
       label: 'Content is inside the safe area',
@@ -135,7 +129,7 @@ export function analyzeDesign(project: Project): DesignReport {
   })
 
   // Word budget -------------------------------------------------------------
-  const budget = project.format === 'shorts' ? 10 : 12
+  const budget = formatConfig(project.format).wordBudget
   checks.push({
     id: 'words',
     label: 'Short, punchy copy',
@@ -154,6 +148,18 @@ export function analyzeDesign(project: Project): DesignReport {
 
 function isFullBleed(obj: SceneObject, project: Project): boolean {
   return obj.x <= 2 && obj.y <= 2 && obj.width >= project.width - 4 && obj.height >= project.height - 4
+}
+
+/**
+ * A layer running edge to edge across the frame — a banner bar, a band behind
+ * a caption, a photo filling the top half. It is backdrop art, so reaching the
+ * edge is the point; text is never a band, so a word in the margin still counts.
+ */
+function isBand(obj: SceneObject, project: Project): boolean {
+  if (obj.type === 'text') return false
+  const across = obj.x <= 2 && obj.width >= project.width - 4
+  const down = obj.y <= 2 && obj.height >= project.height - 4
+  return across || down
 }
 
 /** Rough luminance contrast between the headline and what sits behind it. */
@@ -182,6 +188,15 @@ function contrastCheck(project: Project, headline: TextObject | null): DesignChe
 /** The colour immediately behind a layer: a plate, the background, or nothing. */
 function backdropColor(project: Project, obj: TextObject): number | null {
   if (obj.bgEnabled) return luminance(obj.bgColor)
+  // The nearest layer underneath that covers the whole text box is what the
+  // text is read against: a flat plate gives its colour, a photo means artwork.
+  const index = project.objects.indexOf(obj)
+  for (let i = index - 1; i >= 0; i--) {
+    const under = project.objects[i]
+    if (under.hidden || !contains(under, obj)) continue
+    if (under.type === 'image') return null
+    if (under.type === 'shape' && under.fillEnabled && !under.fade?.enabled && under.opacity >= 90) return luminance(under.fill)
+  }
   const bg = project.background
   if (bg.kind === 'solid') return luminance(bg.color)
   if (bg.kind === 'gradient') {

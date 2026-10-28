@@ -267,7 +267,8 @@ export default function TopBar({ onSave, onExport }: { onSave: () => void; onExp
           Run a test
         </button>
       )}
-      <button className="btn ghost" onClick={() => setPreviewOpen(true)} title="Preview as a YouTube card">
+      <button className="btn ghost" onClick={() => setPreviewOpen(true)} title="Preview it where it will be seen">
+
         <IconEye /> Preview
       </button>
       <button className="btn primary" onClick={onExport} title={formatConfig(project.format).exportLabel}>

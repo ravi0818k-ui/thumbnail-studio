@@ -54,6 +54,7 @@ export function createText(partial: Partial<TextObject> = {}): TextObject {
     autoHeight: true,
     autoFit: 'off',
     noWrap: false,
+    accents: [],
     ...partial,
   }
 }

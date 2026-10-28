@@ -2012,10 +2012,6 @@ button.fp-chip:hover {
   background: #0e1116;
 }
 
-.tile.portrait {
-  aspect-ratio: 9 / 16;
-}
-
 /* --------------------------------------------------------- format cards */
 
 .format-cards {
@@ -2079,6 +2075,11 @@ button.fp-chip:hover {
 
 .format-frame[data-format='shorts'] > span {
   width: 25px;
+  height: 44px;
+}
+
+.format-frame[data-format='linkedin'] > span {
+  width: 35px;
   height: 44px;
 }
 
@@ -5212,4 +5213,353 @@ input[type='color'].rm-backdrop {
   font-size: 20px;
   font-weight: 650;
   pointer-events: none;
+}
+
+/* ------------------------------------------------------- coloured words */
+
+.accent-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.accent-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.accent-swatch.on {
+  border-color: var(--text);
+}
+
+.accent-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.accent-word {
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.accent-word:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.accent-word.on {
+  background: #0d1015;
+}
+
+.accent-inuse {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------ text collection */
+
+.part-group {
+  margin-bottom: 10px;
+}
+
+.part-group-name {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.part-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.part-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #1b2029;
+  text-align: left;
+}
+
+.part-tile:hover {
+  border-color: var(--accent);
+}
+
+.part-tile canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+}
+
+.part-tile > span {
+  padding: 5px 8px 6px;
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.shadow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.shadow-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  /* A mid-grey photo stand-in, so every shadow is visible against it. */
+  background: linear-gradient(135deg, #6b7280, #9ca3af);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.shadow-chip:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.shadow-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.shadow-chip span {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.shadow-soft span {
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.shadow-lifted span {
+  text-shadow: 0 6px 12px rgba(0, 0, 0, 0.85);
+}
+
+.shadow-halo span {
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+.shadow-hard span {
+  text-shadow: 3px 3px 0 #000000;
+}
+
+.shadow-meme span {
+  -webkit-text-stroke: 1.5px #000000;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+/* ------------------------------------------------- LinkedIn feed preview */
+
+.pv-post {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--pv-line);
+  border-radius: 10px;
+  background: var(--pv-bg);
+  font-size: 13px;
+}
+
+.pv-post-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px 6px;
+}
+
+.pv-post-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.pv-post-follow {
+  color: #0a66c2;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pv-post-caption {
+  margin: 0;
+  padding: 2px 14px 10px;
+  color: var(--pv-text);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pv-post-caption span {
+  color: var(--pv-dim);
+}
+
+.pv-post-image {
+  position: relative;
+  overflow: hidden;
+  background: var(--pv-ghost);
+}
+
+.pv-post-image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pv-post-counts {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--pv-line);
+  color: var(--pv-dim);
+  font-size: 12px;
+}
+
+.pv-post-actions {
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 6px 10px;
+  color: var(--pv-dim);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------- LinkedIn post maker */
+
+.li-h3 {
+  max-width: 980px;
+  margin: 28px auto 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.li-sizes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.li-size {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.li-size:hover {
+  border-color: var(--accent);
+}
+
+.li-size-name::first-letter {
+  text-transform: uppercase;
+}
+
+.li-size em {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.li-frame {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 6px;
+}
+
+.li-frame > span {
+  display: block;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  background: rgba(255, 59, 92, 0.12);
+}
+
+.li-templates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.li-templates canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #0e1116;
+}
+
+.li-kit {
+  grid-template-columns: repeat(4, 1fr);
+  max-width: 980px;
+}
+
+@media (max-width: 760px) {
+  .li-kit {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .li-sizes,
+  .li-kit {
+    grid-template-columns: 1fr;
+  }
+
+  .li-size {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 4px 12px;
+  }
+
+  .li-frame {
+    width: 48px;
+    height: 48px;
+    margin: 0;
+  }
 }

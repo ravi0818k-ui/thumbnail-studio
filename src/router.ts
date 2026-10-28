@@ -3,7 +3,8 @@ import type { Screen } from './store/editorStore'
 // ---------------------------------------------------------------------------
 // The app has no router: screens are store state. A screen that people link
 // to, or arrive at from a search, gets a real path here instead — the
-// background remover, the thumbnail downloader and the tutorials. Every other
+// background remover, the thumbnail downloader, the tutorials and the LinkedIn
+// post maker. Every other
 // screen lives at "/".
 //
 // The build writes a copy of index.html at each path (vite.config.ts) so a
@@ -39,6 +40,13 @@ export const ROUTES: Route[] = [
     title: 'YouTube Thumbnail Tutorials — Short Video Lessons | Thumbnail Studio',
     description:
       'Short video lessons for Thumbnail Studio: your first thumbnail in 7 minutes, previewing it in dark mode, light mode and on mobile, adding icons, and painting a watched bar. Every lesson opens the feature it teaches.',
+  },
+  {
+    screen: 'linkedin',
+    path: '/linkedin-post-maker',
+    title: 'Free LinkedIn Post Maker — Minimal News, Quote & Meme Posts | Thumbnail Studio',
+    description:
+      'Design minimal LinkedIn image posts for free: news cards with a coloured headline, tweet and quote cards, memes. 4:5, square or landscape, with photo shadows and a preview in the feed. Runs in your browser.',
   },
 ]
 

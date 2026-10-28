@@ -14,7 +14,8 @@ import type {
 import { getLoadedAsset } from './assets'
 import { watchedBarRects } from '../data/formats'
 import { FILTER_BY_ID, scaleFilter } from '../data/filters'
-import { applyTextFont, drawLine, layoutText, lineGeometry, measureLine, textRasterPadding } from './text'
+import { applyTextFont, drawLine, layoutText, lineGeometry, measureLine, textRasterPadding, type TextLayout } from './text'
+import { displayMap, lineRuns } from './textAccents'
 
 type Ctx = CanvasRenderingContext2D
 
@@ -575,6 +576,11 @@ function drawTextObject(ctx: Ctx, obj: TextObject): void {
     ctx.textAlign = obj.align
   }
 
+  if (obj.accents?.length) {
+    drawAccentedLines(ctx, obj, layout, x, pad + geometry.baseline)
+    return
+  }
+
   layout.lines.forEach((line, i) => {
     const y = i * layout.lineHeight + pad + geometry.baseline
     if (obj.strokeWidth > 0) {
@@ -590,6 +596,45 @@ function drawTextObject(ctx: Ctx, obj: TextObject): void {
       ctx.fillStyle = obj.color
       drawLine(ctx, line, x, y, obj.letterSpacing, 'fill')
     }
+  })
+}
+
+/**
+ * Lines with coloured words, drawn run by run from the left edge the aligned
+ * line would start at. Stroke goes down first for the whole line, run by run
+ * too, so outline and fill land on exactly the same glyph positions. Text
+ * without accents keeps the single-call path above, unchanged.
+ */
+function drawAccentedLines(ctx: Ctx, obj: TextObject, layout: TextLayout, anchor: number, baseline: number): void {
+  const { source } = displayMap(obj.text, obj.uppercase)
+  ctx.textAlign = 'left'
+  layout.lines.forEach((line, i) => {
+    const y = i * layout.lineHeight + baseline
+    const runs = lineRuns(line, layout.starts[i] ?? 0, source, obj.accents, obj.color)
+    const widths = runs.map((r) => measureLine(ctx, r.text, obj.letterSpacing))
+    const total = widths.reduce((a, b) => a + b, 0)
+    const left = obj.align === 'left' ? anchor : obj.align === 'right' ? anchor - total : anchor - total / 2
+    if (obj.strokeWidth > 0) {
+      ctx.save()
+      ctx.lineWidth = obj.strokeWidth * 2
+      ctx.strokeStyle = obj.strokeColor
+      ctx.lineJoin = 'round'
+      ctx.miterLimit = 2
+      let cursor = left
+      runs.forEach((run, k) => {
+        drawLine(ctx, run.text, cursor, y, obj.letterSpacing, 'stroke')
+        cursor += widths[k]
+      })
+      ctx.restore()
+    }
+    let cursor = left
+    runs.forEach((run, k) => {
+      if (run.color !== 'transparent') {
+        ctx.fillStyle = run.color
+        drawLine(ctx, run.text, cursor, y, obj.letterSpacing, 'fill')
+      }
+      cursor += widths[k]
+    })
   })
 }
 

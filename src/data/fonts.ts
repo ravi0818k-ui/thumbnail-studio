@@ -12,6 +12,8 @@ export const FONTS: FontDef[] = [
   { family: 'Montserrat', label: 'Montserrat', category: 'Bold', weights: [700, 900] },
   { family: 'Poppins', label: 'Poppins', category: 'Modern', weights: [700, 900] },
   { family: 'Inter', label: 'Inter', category: 'Modern', weights: [400, 600, 700, 900] },
+  // Hindi and Marathi headlines: none of the faces above carries Devanagari.
+  { family: 'Noto Sans Devanagari', label: 'Noto Sans Devanagari (Hindi)', category: 'Modern', weights: [600, 800] },
   { family: 'League Spartan', label: 'League Spartan', category: 'Bold', weights: [700, 800, 900] },
   { family: 'Bebas Neue', label: 'Bebas Neue', category: 'Condensed', weights: [400] },
   { family: 'Oswald', label: 'Oswald', category: 'Condensed', weights: [500, 700] },

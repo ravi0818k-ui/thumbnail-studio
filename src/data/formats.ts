@@ -60,6 +60,20 @@ export interface FormatConfig {
   /** Whether the canvas size can be changed. A banner has exactly one size. */
   resizable: boolean
   /**
+   * Whether turning the canvas portrait or landscape switches between the
+   * thumbnail and the Shorts cover. A LinkedIn post has portrait, square and
+   * landscape sizes of its own, so for it orientation decides nothing.
+   */
+  sizeDecidesFormat: boolean
+  /**
+   * Smallest headline that still reads on a phone, as a share of canvas
+   * height. A Short or a post fills the screen, so it can carry proportionally
+   * smaller text than a thumbnail shown in a 168 px grid cell.
+   */
+  minHeadline: number
+  /** Words the composition check allows before calling the copy long. */
+  wordBudget: number
+  /**
    * Whether the thumbnail scorer and test report apply. They measure how a
    * design survives a feed card; a banner is never shown as one.
    */
@@ -115,11 +129,14 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     // Duration chip, progress bar and the hover overlay live along the bottom.
     safeZone: { top: 4, bottom: 11, left: 3, right: 3, warning: 3 },
     toolbar: ['brand', 'templates', 'uploads', 'text', 'elements', 'icons', 'background', 'layers'],
+    minHeadline: 0.1,
+    wordBudget: 12,
     exportLabel: 'Download Thumbnail',
     safeZoneHint: 'Keeps content clear of the duration chip and progress bar.',
     exportNote: 'YouTube accepts files up to 2 MB. 1280 × 720 PNG at 1× is the safe default.',
     background: 'solid',
     resizable: true,
+    sizeDecidesFormat: true,
     scored: true,
     watchedBar: true,
     newBadge: true,
@@ -141,11 +158,14 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     // and description block along the bottom.
     safeZone: { top: 9, bottom: 20, left: 4, right: 13, warning: 4 },
     toolbar: ['templates', 'uploads', 'text', 'background', 'elements', 'icons', 'brand', 'layers'],
+    minHeadline: 0.045,
+    wordBudget: 10,
     exportLabel: 'Download Shorts Cover',
     safeZoneHint: 'Keeps content clear of the action rail, title and channel row.',
     exportNote: 'YouTube accepts files up to 2 MB. 1080 × 1920 PNG at 1× is the safe default for a Shorts cover.',
     background: 'solid',
     resizable: true,
+    sizeDecidesFormat: true,
     scored: true,
     watchedBar: false,
     newBadge: false,
@@ -162,20 +182,57 @@ export const FORMATS: Record<CanvasFormat, FormatConfig> = {
     safeZone: safeZoneForGuide(BANNER_GUIDES[BANNER_GUIDES.length - 1], 2560, 1440),
     // No templates yet, so the rail opens on the photo and type tools.
     toolbar: ['uploads', 'text', 'elements', 'icons', 'background', 'brand', 'layers'],
+    // The mobile band is shown about 390 px wide, a quarter of its 1546, so 5% lands near 18 px.
+    minHeadline: 0.05,
+    wordBudget: 12,
     exportLabel: 'Download Banner',
     safeZoneHint: 'Every device shows a centred band of the upload. Keep your name and logo inside Mobile.',
     exportNote:
       'YouTube accepts banners up to 6 MB, at least 2048 × 1152. Export at 1× — 2560 × 1440 is the size to upload.',
     background: 'none',
     resizable: false,
+    sizeDecidesFormat: false,
     scored: false,
     watchedBar: false,
     newBadge: false,
     guides: BANNER_GUIDES,
   },
+  linkedin: {
+    id: 'linkedin',
+    label: 'LinkedIn Post',
+    shortLabel: 'LinkedIn',
+    glyph: '💼',
+    description: 'Minimal image post for the LinkedIn feed.',
+    width: 1080,
+    height: 1350,
+    // 4:5 is the tallest image the feed shows uncropped, so it takes the most
+    // of a phone screen; square and landscape are there for reposts.
+    presets: [
+      { label: '1080 × 1350 · portrait 4:5', width: 1080, height: 1350, recommended: true },
+      { label: '1080 × 1080 · square', width: 1080, height: 1080 },
+      { label: '1200 × 627 · landscape', width: 1200, height: 627 },
+    ],
+    // LinkedIn draws nothing over a post image, so this is a margin, not a
+    // keep-out: type that kisses the edge reads as cropped.
+    safeZone: { top: 2.5, bottom: 2.5, left: 4, right: 4, warning: 2 },
+    toolbar: ['templates', 'text', 'uploads', 'elements', 'icons', 'background', 'brand', 'layers'],
+    // A post is read, not glanced at: a news card's headline runs to forty words, at
+    // about 17 px on a phone.
+    minHeadline: 0.03,
+    wordBudget: 45,
+    exportLabel: 'Download Post',
+    safeZoneHint: 'LinkedIn covers nothing; this margin keeps text from touching the edge.',
+    exportNote: 'LinkedIn accepts images up to 5 MB. 1080 × 1350 PNG is the size the feed shows at full height.',
+    background: 'solid',
+    resizable: true,
+    sizeDecidesFormat: false,
+    scored: false,
+    watchedBar: false,
+    newBadge: false,
+  },
 }
 
-export const FORMAT_LIST = [FORMATS.thumbnail, FORMATS.shorts, FORMATS.banner]
+export const FORMAT_LIST = [FORMATS.thumbnail, FORMATS.shorts, FORMATS.banner, FORMATS.linkedin]
 
 /** Portrait canvases are Shorts; used to classify projects saved before formats (there were no banners then). */
 export function formatForSize(width: number, height: number): CanvasFormat {
