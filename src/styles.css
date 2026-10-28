@@ -82,6 +82,10 @@ textarea {
 .editor {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr) 300px;
+  /* The row is the window's height, never the canvas's: an auto row grows to a
+     tall canvas drawn at the previous zoom, pushes the zoom bar off-screen, and
+     the fit zoom is then measured from that stretched stage and never corrects. */
+  grid-template-rows: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
 }
@@ -95,6 +99,8 @@ textarea {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background: radial-gradient(circle at 50% 30%, #12161d 0%, #080a0e 70%);
 }
 
